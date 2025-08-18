@@ -29,6 +29,9 @@ from io import StringIO
 #================================================================================
 
 KPI_folder              = "E:/Algo_Trading_V3/Input Files/KPI/"
+existing_pre_market_data= "E:/Algo_Trading_V3/Input Files/Instruments/pre_open_market_data.csv"
+NSE_Stock_script        = "E:/Algo_Trading_V3/Input Files/Instruments/NSEScripMaster.txt"
+NIF_50_Stock_list       = "E:/Algo_Trading_V3/Input Files/Instruments/NIFTY50_Stock_List.csv"
 
 
 class Global_function():
@@ -133,7 +136,8 @@ class Global_function():
                
                
                return df1
-           
+
+    @staticmethod
     def load_ticks_with_calc_in_df(df,tick_df,MVA_period,EMV_period,VWAP,index_weight):
 
     
@@ -793,11 +797,11 @@ class Global_function():
             driver.quit()
 
         return df
-        
-    
-    
+
+    @staticmethod
     def fetch_NIFTY_data():
-          
+
+          global existing_pre_market_data
           counter   =   0  
           df        =   pd.DataFrame()
 
@@ -810,24 +814,25 @@ class Global_function():
           if len(df) >50:
               
               df = df.rename(columns={'FFM CAP(₹ Crores)': 'FFM CAP(in Crores)'})
-              df.to_csv("E:/Algo_Trading_V3/Input Files/Instruments/pre_open_market_data.csv", index=False)
+              df.to_csv(existing_pre_market_data, index=False)
               
               
           else:
               
               #read old market data
               
-              df    =   pd.read_csv("E:/Algo_Trading_V3/Input Files/Instruments/pre_open_market_data.csv")
+              df    =   pd.read_csv(existing_pre_market_data)
               
-          return df   
-      
-        
-      
-        
+          return df
+
+    @staticmethod
     def Get_pre_open_stock_list_NIFTY50():
 
+          global NSE_Stock_script,NIF_50_Stock_list
+
+
           #reading stored data
-          ICICI_database          = pd.read_csv("E:/Algo_Trading_V3/Input Files/Instruments/NSEScripMaster.txt")
+          ICICI_database          = pd.read_csv(NSE_Stock_script)
           
           #Cleaning headers with unnecessary comma and spaces
           ICICI_database.columns  = ICICI_database.columns.str.strip().str.replace('"', '').str.replace(' ', '')
@@ -861,7 +866,7 @@ class Global_function():
           #rename colume names
           merged_df   =  merged_df.rename(columns={'ShortName': 'stock_name'}) 
           
-          merged_df.to_csv("E:/Algo_Trading_V3/Input Files/Instruments/NIFTY50_Stock_List.csv", index=False)
+          merged_df.to_csv(NIF_50_Stock_list, index=False)
           
           return merged_df
 
@@ -902,3 +907,4 @@ class Global_function():
 
 
 
+a   = Global_function.read_NIFTY_preopen()

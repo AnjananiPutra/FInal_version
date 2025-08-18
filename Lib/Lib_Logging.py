@@ -85,7 +85,8 @@ class Log():
         def info_msg(colour_name,msg,display_flag):
             logger = Log.setup_logger("INFO")
             logger.info(msg)
-            
+            logger.debug(msg)
+
             if display_flag  ==   True:
                 print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}",flush=True)
 
@@ -94,6 +95,8 @@ class Log():
             
             logger = Log.setup_logger("WARNING")
             logger.warning(msg)
+            logger.info(msg)
+            logger.debug(msg)
         
             if display_flag  ==   True:
                 print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}")
@@ -103,7 +106,10 @@ class Log():
             
             logger = Log.setup_logger("ERROR")
             logger.error(msg)
-            
+            logger.warning(msg)
+            logger.info(msg)
+            logger.debug(msg)
+
             if display_flag  ==   True:
                 print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}")
 
@@ -113,6 +119,10 @@ class Log():
             
             logger = Log.setup_logger("CRITICAL")
             logger.critical(msg)
-            
+            logger.error(msg)
+            logger.warning(msg)
+            logger.info(msg)
+            logger.debug(msg)
+
             if display_flag  ==   True:
                 print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}")

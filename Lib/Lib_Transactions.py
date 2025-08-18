@@ -23,11 +23,9 @@ class Transactions():
 
         
     def __init__(self,OC_object ,right,T_count,quantity):
-        return 
-    
-    
-    
-                
+        return
+
+    @staticmethod
     def display_P_and_L(trade_list):
         try:
             
@@ -72,7 +70,8 @@ class Transactions():
             print(f'Error while extracting information \nError Description::{e}')
             txt     =   f'{traceback.format_exc()}'
             print(txt)
-        
+
+    @staticmethod
     def convert_data_format(df):
         
         # Convert relevant columns to numeric, handling errors
@@ -84,7 +83,8 @@ class Transactions():
             df[col] = pd.to_datetime(df[col], errors='coerce')
         
         return df
-    
+
+    @staticmethod
     def trade_value(df):
         """Calculates a custom sumproduct based on the 'action' column.
 

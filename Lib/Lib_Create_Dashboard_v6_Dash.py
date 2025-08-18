@@ -18,6 +18,7 @@ class Dashboard():
     def __init__(self):
         return
 
+    @staticmethod
     def create_checkbox_list(names_list, id_prefix="checkbox", default_checked_list=None):
             """
             Creates individual HTML checkboxes with unique IDs for each name, aligned vertically to the right of the chart.
@@ -63,8 +64,7 @@ class Dashboard():
                 }
             )
 
-
-
+    @staticmethod
     def create_dual_line_plot(chart_id):
         
         
@@ -84,8 +84,7 @@ class Dashboard():
             }
         )
 
-
-    
+    @staticmethod
     def create_dual_line_plot_set(count):
         
             children_components = []
@@ -118,7 +117,7 @@ class Dashboard():
                 style={'width': '100%', 'padding': '10px'}
             )
 
-
+    @staticmethod
     def create_dash_table(table_id,df,td_width,page_size):
         
         
@@ -157,9 +156,9 @@ class Dashboard():
                                            
                                         )
       
-        return table 
+        return table
 
-
+    @staticmethod
     def publish_table(df):
           
         #converting dataframe data to text which can be read and shown by plotly to browser
@@ -170,7 +169,8 @@ class Dashboard():
           
           
           return table
-      
+
+    @staticmethod
     def create_interval(interval_id,refresh_rate):
         
         count   =   round(1000/refresh_rate,0)
@@ -184,7 +184,8 @@ class Dashboard():
         
         
         return obj
-    
+
+    @staticmethod
     def create_dropdown_list(Label_name,label_max_count):
         
           # Create a list of logic names
@@ -200,7 +201,8 @@ class Dashboard():
           df = pd.DataFrame(data)
           
           return df
-    
+
+    @staticmethod
     def create_dash_dropdown(dropdown_id,dropdown_df,default_option):
       
       dropdown_records  =   dropdown_df.to_dict('records')
@@ -222,12 +224,14 @@ class Dashboard():
       
       return drop_down
 
+    @staticmethod
     def create_dash_candlestick_chart(cs_chart_id):
       
       cs_chart =  dcc.Graph(id  =   cs_chart_id, style={'height': '95%','width': '95%','border': '1px solid gray'})  
       
       return cs_chart
-  
+
+    @staticmethod
     def create_dash_buttons(button_id,button_text):
         
         button =  html.Button(
@@ -239,8 +243,8 @@ class Dashboard():
                               )
         
         return button
-    
-    
+
+    @staticmethod
     def create_dash_label(label_id,label_text):
         
         label =  html.Label(
@@ -251,7 +255,8 @@ class Dashboard():
         
         
         return label
-    
+
+    @staticmethod
     def get_chart_axis_range(relayout_data):
         
         #gets the range data if the user has made any selection
@@ -582,8 +587,8 @@ class Dashboard():
         fig.update_layout(**layout_kwargs)
     
         return fig
-    
-        
+
+    @staticmethod
     def plot_dual_chart_object_list(object_list):
         '''
         Parameters
@@ -612,14 +617,9 @@ class Dashboard():
             
             plot_obj_list.append(chart_plot)
             
-        return plot_obj_list     
-   
+        return plot_obj_list
 
-     
-
-    
-    
-    
+    @staticmethod
     def plot_dual_chart(call_df,put_df,title,call_color,put_color): 
         
         

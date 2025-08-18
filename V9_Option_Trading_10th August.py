@@ -22,7 +22,7 @@ from Lib.Indicators import Indicators
 from Lib.Lib_Transactions import Transactions
 from dash import  dcc, html, Input, Output, State
 from Lib.Lib_Connect_Breeze import Connect_Breeze
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, date, time, timezone,timedelta
 from Lib.Lib_Create_Dashboard_v6_Dash import Dashboard
 from Lib.Lib_Global_Functions_V3 import Global_function
 
@@ -119,8 +119,8 @@ def main():
     global code_start_time, mkt_start_time, code_end_time, queue_length
 
     # Initialisation of variables
-    code_start_time     = time(5, 1)
-    mkt_start_time      = time(5, 15)
+    code_start_time     = time(0, 1)
+    mkt_start_time      = time(0, 15)
     code_end_time       = time(15, 30)
     ticks_queue         = multiprocessing.Queue()
     option_chain_queue  = multiprocessing.Queue()
@@ -163,7 +163,7 @@ def main():
     NIFTY_Index.init_class_variables()
     NIFTY_Stocks.initiate_class()
 
-
+    a = IP.En_L1
     threads,processes = Thread_Scheduler.start_threads_and_processes(start_events,
                                                                      pause_events,
                                                                      ticks_queue,
@@ -445,7 +445,8 @@ class Option_Chain():
     SP_list = []  # float
     SP_df = pd.DataFrame(
         columns=['Address', 'strike_price', 'focus_SP', 'call_buy_flag', 'put_buy_flag', 'call_sell_flag',
-                 'put_sell_flag', 'call_tick_count', 'put_tick_count'])
+                 'put_sell_flag','call_buy_flag_time', 'put_buy_flag_time', 'call_sell_flag_time',
+                 'put_sell_flag_time', 'call_tick_count', 'put_tick_count'])
     lot_size = 75
     expiry_date = datetime.now()
 
@@ -2077,6 +2078,7 @@ class Option_Chain():
 
         try:
             for index, row in SP_df.iterrows():
+                print(f"DF::{row['Address']} Type::{type(row['Address'])}")
                 obj         = row['Address']
                 old_result  = row['call_buy_flag']
                 result      = obj.evaluate_SP_call_buy(evaluation_parameters)
@@ -2117,6 +2119,7 @@ class Option_Chain():
 
         try:
                 for index, row in SP_df.iterrows():
+                    print(f"DF::{row['Address']} Type::{type(row['Address'])}")
                     obj         = row['Address']
                     result      = obj.evaluate_SP_call_sell(evaluation_parameters)
                     old_result  = row['call_sell_flag']
@@ -2156,7 +2159,9 @@ class Option_Chain():
 
         try:
             for index, row in SP_df.iterrows():
-                obj = row['Address'][0]  # Adjust if Address isn't list-like
+
+                print(f"DF::{row['Address']} Type::{type(row['Address'])}")
+                obj = row['Address']  # Adjust if Address isn't list-like
 
                 result = obj.evaluate_SP_put_sell(evaluation_parameters)
                 old_result = row['put_sell_flag']
@@ -2196,7 +2201,8 @@ class Option_Chain():
 
         try:
             for index, row in SP_df.iterrows():
-                obj         = row['Address'][0]  # Assumes Address holds a list-like container
+                print(f"DF::{row['Address']} Type::{type(row['Address'])}")
+                obj         = row['Address']  # Assumes Address holds a list-like container
                 result      = obj.evaluate_SP_put_buy(evaluation_parameters)
                 old_result  = row['put_buy_flag']
 
@@ -4611,7 +4617,7 @@ class Entry_Scanners():
     @staticmethod
     def Start_scanning(start_event, pause_event):
         try:
-            txt = f'Waiting for start event to set for Entry scanner'
+            txt = f'Entry Scanner Worker thread waiting for Start_event'
             Log.debug_msg("Blue",txt,True)
 
 
@@ -4944,6 +4950,7 @@ class Entry_Scanners():
     @staticmethod
     def CE_NIFTY_Index_levels_confirmation(NIF_df, evaluation_parameters):
 
+
         '''
         Parameters
         ----------
@@ -4966,13 +4973,21 @@ class Entry_Scanners():
         Returns 1 or 0 i.e., buy or not to buy
         '''
 
+        if NIF_df is None or NIF_df.empty or evaluation_parameters is None or evaluation_parameters.empty:
+
+            txt = f'Either NIFTY data frame is empty or evaluation parameters data frame is empty'
+            Log.critical_msg('Cyan',txt,True)
+            txt = f'NIFTY dataframe length ::{len(NIF_df)} Eval. Parameters dataframe length::{len(evaluation_parameters)}'
+            Log.critical_msg('Cyan', txt, True)
+            return None
+
         #Define Alias
         EP = evaluation_parameters.iloc[-1]
         T1, T2, T3 = EP.loc[['T1', 'T2', 'T3']].values.astype(int)
         max_duration = max(T1, T2, T3)
 
-        #Define NIFTY parameter Alias
-        NIF_T1,NIF_T2,NIF_T3 = EP['call_NIF_T1','call_NIF_T2','call_NIF_T3']
+        #Setting Alias for required increase in NIFTY parameter
+        NIF_T1,NIF_T2,NIF_T3 = EP.loc[['call_NIF_T1','call_NIF_T2','call_NIF_T3']].values
 
 
         # Calculate average price of put in T1, T2, T3 durations
@@ -4992,6 +5007,68 @@ class Entry_Scanners():
 
         #check if all entry condition is True then return True else return False
         return True if all(condition is True for condition in conditions) else False
+
+    @staticmethod
+    def PE_NIFTY_Index_levels_confirmation(NIF_df, evaluation_parameters):
+
+
+        '''
+        Parameters
+        ----------
+        df : Dataframe  || It contains the data of strike price to be evaluated
+        T1 : Integer    || The first time slot for evaluation to check short trend
+        T2 : Integer    || The second time slot for evaluation to check medium term trend
+        T3 : Integer    || The third time slot for evaluation to check longer term continuity of trend
+        VF : Float      || The sudden flux increase in volume over each second compared to Avg. volume
+        Max_Vol : Float || The Absolute maximum volume in a given period
+        CP_G1 : Float   || The % increase in call price in T1 duration
+        CP_G2 : Float   || The % increase in call price in T2 duration
+        CP_G3 : Float   || The % increase in call price in T2 duration
+        VWAP_50 : Float || height of close from VWAP of 50 stocks used to find change in trend
+        VWAP_20 : Float || height of close from VWAP of 20 stocks used to find change in trend
+        VWAP_10 : Float || height of close from VWAP of 10 stocks used to find change in trend
+        NIF_T1 :  Float || NIFTY increase in last T1 seconds
+        NIF_T2 :  Float || NIFTY increase in last T2 seconds
+        NIF_T3 : Float  || NIFTY increase in last T3 seconds
+
+        Returns 1 or 0 i.e., buy or not to buy
+        '''
+
+        if NIF_df is None or NIF_df.empty or evaluation_parameters is None or evaluation_parameters.empty:
+
+            txt = f'Either NIFTY data frame is empty or evaluation parameters data frame is empty'
+            Log.critical_msg('Cyan',txt,True)
+            txt = f'NIFTY dataframe length ::{len(NIF_df)} Eval. Parameters dataframe length::{len(evaluation_parameters)}'
+            Log.critical_msg('Cyan', txt, True)
+            return None
+
+        #Define Alias
+        EP = evaluation_parameters.iloc[-1]
+        T1, T2, T3 = EP.loc[['T1', 'T2', 'T3']].values.astype(int)
+        max_duration = max(T1, T2, T3)
+
+        #Setting Alias for required increase in NIFTY parameter
+        NIF_T1,NIF_T2,NIF_T3 = EP.loc[['put_NIF_T1','put_NIF_T2','put_NIF_T3']].values
+
+
+        # Calculate average price of put in T1, T2, T3 durations
+        mean_NIF = {
+                    'T1': NIF_df['close'].iloc[-T1:-2].mean(),
+                    'T2': NIF_df['close'].iloc[-T2:-2].mean(),
+                    'T3': NIF_df['close'].iloc[-T3:-2].mean()
+                }
+
+        # Testing conditions
+        C1 = (NIF_df['close'].iloc[-1] / mean_NIF['T1']) > NIF_T1
+        C2 = (NIF_df['close'].iloc[-1] / mean_NIF['T2']) > NIF_T2
+        C3 = (NIF_df['close'].iloc[-1] / mean_NIF['T3']) > NIF_T3
+
+        # encapsulate variables
+        conditions = [C1, C2, C3]
+
+        #check if all entry condition is True then return True else return False
+        return True if all(condition is True for condition in conditions) else False
+
 
     @staticmethod
     def CE_vol_price_action_confirmation(call_df, evaluation_parameters):
@@ -5017,12 +5094,19 @@ class Entry_Scanners():
 
         Returns 1 or 0 i.e. buy or not to buy
         '''
+        if call_df is None or call_df.empty or evaluation_parameters is None or evaluation_parameters.empty:
+
+            txt = f'Either call data frame is empty or evaluation parameters data frame is empty'
+            Log.critical_msg('Cyan',txt,True)
+            txt = f'call dataframe length ::{len(call_df)} Put dataframe length::{len(evaluation_parameters)}'
+            Log.critical_msg('Cyan', txt, True)
+            return None
 
         EP                  = evaluation_parameters.iloc[-1]
         T1, T2, T3          = EP.loc[['T1', 'T2', 'T3']].values.astype(int)
         max_duration        = int(max(T1, T2, T3))
-        VC,VF               = EP[['VC','VF']]
-        CP_G1, CP_G2, CP_G3 = EP[['PP1', 'PP2', 'PP3']]
+        VC,VF               = EP.loc[['VC','VF']].values
+        CP_G1, CP_G2, CP_G3 = EP.loc[['PP1', 'PP2', 'PP3']].values
         max_duration        = max(T1, T2, T3)
         max_VF              = call_df['volume_factor'].iloc[-max_duration:-2]
         max_Vol             = call_df['volume'].iloc[-max_duration:-2]
@@ -5050,6 +5134,7 @@ class Entry_Scanners():
     @staticmethod
     def PE_vol_price_action_confirmation(put_df, evaluation_parameters):
 
+        print(f"Put price parameters::{evaluation_parameters}")
         '''
         Parameters
         ----------
@@ -5072,6 +5157,13 @@ class Entry_Scanners():
 
         Returns 1 or 0 i.e. buy or not to buy
         '''
+        if put_df is None or put_df.empty or evaluation_parameters is None or evaluation_parameters.empty:
+
+            txt = f'Either call data frame is empty or evaluation parameters data frame is empty'
+            Log.critical_msg('Cyan',txt,True)
+            txt = f'call dataframe length ::{len(put_df)} Put dataframe length::{len(evaluation_parameters)}'
+            Log.critical_msg('Cyan', txt, True)
+            return None
 
         EP                  = evaluation_parameters.iloc[-1]
         T1, T2, T3          = EP.loc[['T1', 'T2', 'T3']].values.astype(int)
@@ -5163,6 +5255,8 @@ class Exit_Scanners():
 
             txt =f'Square-Off thread for order-id::{order_id} initiated'
             Log.debug_msg('Blue',txt,True)
+
+
     @staticmethod
     def square_off_all_holdings():
         try:
@@ -5189,21 +5283,32 @@ class Exit_Scanners():
             # Step 3: Square off each option position
             for pos in options_positions:
                 try:
-                    symbol = pos['stock_code']
-                    exchange = pos['exchange_code']
-                    quantity = abs(int(pos['quantity']))
-                    action = 'sell' if pos['buy_or_sell'] == 'buy' else 'buy'
-                    expiry_date = str(expiry_date_iso)
+                    symbol      = pos['stock_code']
+                    exchange    = pos['exchange_code']
+                    quantity    = abs(int(pos['quantity']))
+                    action      = 'sell' if pos['buy_or_sell'] == 'buy' else 'buy'
+                    expiry_date = pos['expiry_date']
+
+                    # Add 6 hours and set timezone to UTC
+                    expiry_date_iso = datetime.strptime(expiry_date, '%d-%b-%Y')
+
+                    # Format to ISO 8601
+                    expiry_date_iso = expiry_date_iso.replace(hour=6, tzinfo=timezone.utc)
+
+                    # Expiry Date ISO format
+                    expiry_date_iso = expiry_date_iso.isoformat()
+
                     print(f"Squaring off {symbol} - {action} {quantity} units")
 
                     response = breeze.square_off(
                                                     stock_code          =   symbol,
+                                                    expiry_date         =   expiry_date_iso,
                                                     exchange_code       =   exchange,
                                                     product_type        =   "Options",
                                                     action              =   action,
                                                     order_type          =   "market",
                                                     quantity            =   quantity,
-                                                    price               =   0,  # Market order
+                                                    price               =   "",  # Market order
                                                     validity            =   "day",
                                                     validity_date       =   "",
                                                     disclosed_quantity  =   "0",
@@ -5222,7 +5327,11 @@ class Exit_Scanners():
             pass
         except Exception as e:
 
-            pass
+
+            txt = f'error while liquidating all the holdings /nError Details::{e}'
+            Log.error_msg('Red',txt,True)
+
+            Log.error_msg('Red',f'Traceback::{traceback.format_exc()}',True)
 
         finally:
 
@@ -5610,10 +5719,12 @@ class Thread_Scheduler():
             return threads, processes
 
         except Exception as oe:
+
             txt = f"Unknown type of error happened at start_threads_and_processes"
-            print(txt)
+            Log.error_msg('Red',txt,True)
             txt = f'Error Details::{oe}'
-            print(txt)
+            Log.error_msg('Red',txt,True)
+
             return threads, processes
     @staticmethod
     def OC_STK_auto_archival(start_time, end_time, time_gap,
@@ -5640,7 +5751,7 @@ class Thread_Scheduler():
             while start_event.is_set():
                 if idx >= len(schedule):
                     Log.info_msg("Yellow",
-                                 "All time slots processed; worker exiting.", True)
+                                 "Archival worker exiting due as all time slots in databse are processed.Thank you.", True)
                     break
 
                 now = datetime.now()
@@ -5690,7 +5801,7 @@ class Thread_Scheduler():
                           True)
             raise
         finally:
-            Log.info_msg("Yellow", "Auto‑archival thread exiting.", True)
+            Log.info_msg("Green", "Auto‑archival thread exiting execution.", True)
 
     @staticmethod
     def Archieve_manager(args):
