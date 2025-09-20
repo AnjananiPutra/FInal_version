@@ -10,6 +10,15 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, date, time,timedelta
 from dash import Dash,dcc, html, dash_table, Input, Output, State
+import pandas as pd
+import numpy as np
+import plotly.graph_objs as go
+from dash import Dash, dcc, html
+import math
+import pandas as pd
+import dash
+from dash import dcc, html, Input
+from datetime import timedelta
 
 #import dash_core_components as dcc
 
@@ -17,6 +26,161 @@ class Dashboard():
     
     def __init__(self):
         return
+
+
+    @staticmethod
+    def get_app_layout(nif_index_value_df,entry_logic_drop_down_list,exit_drop_down_layout_list,tick_stats,nif_vwap_df,p_and_l_df,focus_call_df_list,focus_put_df_list,opt_chain_disp_tree_df,nif_stocks_disp_tree_df):
+        try:
+           #Entire Page container layout
+           layout = html.Div(
+                            [
+                                  #First top vertical container carrying headers
+                                  html.Div(
+                                  [
+
+                                            # header 1 column 1 First Object containing NIFTY 50 Value Labels and dropdowns
+                                            html.Div(
+                                            [
+                                                        Dashboard.create_dash_table('table_nif_value',nif_index_value_df, "100%", 10),
+                                                        Dashboard.create_dash_dropdown("Entry_Logic", entry_logic_drop_down_list, 0),
+                                                        Dashboard.create_dash_dropdown("Exit_Logic", exit_drop_down_layout_list, 0),
+
+                                                    ], style={
+                                                                'display': 'flex',              # Enables Flexbox layout for child elements
+                                                                'flexDirection': 'column',      # Stacks child elements vertically (top to bottom)
+                                                                'alignItems': 'flex-start',     # Aligns children to the start of the cross-axis (left edge)
+                                                                'gap': '10px',                  # Adds 10px vertical spacing between stacked children
+                                                                'marginRight': '20px'           # Adds 20px space to the right of this container (useful for column separation)
+
+                                                              }
+                                                    ),
+
+                                            # Header 1:column 2 :It contains buttons  used to control program parameters
+                                            html.Div(
+                                            [
+                                                        Dashboard.create_dash_buttons('Entry_Block-btn', 'Block Entry'),
+                                                        Dashboard.create_dash_buttons('Sq_off_Block-btn', 'Hold all Trades'),
+                                                        Dashboard.create_dash_buttons('Liquidate_All-btn', 'Liquidate All'),
+                                                        Dashboard.create_dash_buttons('Shutdown-btn', 'Shutdown code'),
+                                                    ], style={
+                                                                'display': 'flex',              # Enables Flexbox layout for child elements
+                                                                'flexDirection': 'column',      # Stacks child elements vertically (top to bottom)
+                                                                'alignItems': 'flex-start',     # Aligns children to the start of the cross-axis (left edge)
+                                                                'gap': '10px',                  # Adds 10px vertical spacing between stacked children
+                                                                'marginRight': '20px'           # Adds 20px space to the right of this container (useful for column separation)
+
+                                                              },
+                                                    ),
+                                            html.Div(
+                                            [
+
+                                                        Dashboard.create_dash_table('table_tick_stats', tick_stats, "100%", 10),
+                                                    ], style={
+                                                                'display': 'inline-block',     # Allows the element to sit inline with others, but still accept width/height styling
+                                                                'marginLeft': '10px',          # Adds 10px spacing to the left of the element (separates it from its left neighbor)
+                                                                'marginRight': '10px',         # Adds 10px spacing to the right of the element (separates it from its right neighbor)
+                                                                'marginBottom': '5px'          # Adds 5px spacing below the element (useful for vertical stacking or padding)
+                                                             }
+                                                    ),
+
+                                            html.Div(
+                                            [
+                                                        Dashboard.create_dash_table('table_NIFTY_vwap', nif_vwap_df, "100%", 10),
+                                                    ], style={
+                                                                'display': 'inline-block',     # Allows the element to sit inline with others, but still accept width/height styling
+                                                                'marginLeft': '10px',          # Adds 10px spacing to the left of the element (separates it from its left neighbor)
+                                                                'marginRight': '10px',         # Adds 10px spacing to the right of the element (separates it from its right neighbor)
+                                                                'marginBottom': '5px'          # Adds 5px spacing below the element (useful for vertical stacking or padding)
+                                                             },
+                                                    ),
+
+                                            # need to Put P&L summary here in df format
+                                            html.Div(
+                                            [
+                                                        Dashboard.create_dash_table('table_P_and_L', p_and_l_df, "100%", 10),
+                                                    ], style={
+                                                                'display': 'inline-block',     # Allows the element to sit inline with others, but still accept width/height styling
+                                                                'marginLeft': '10px',          # Adds 10px spacing to the left of the element (separates it from its left neighbor)
+                                                                'marginRight': '10px',         # Adds 10px spacing to the right of the element (separates it from its right neighbor)
+                                                                'marginBottom': '5px'          # Adds 5px spacing below the element (useful for vertical stacking or padding)
+                                                             },
+                                                    ),
+
+                                            ], style={
+                                                        'display': 'flex',              # Activates Flexbox layout, allowing child elements to be aligned and spaced dynamically
+                                                        'flexDirection': 'row',         # Arranges child elements horizontally from left to right
+                                                        'alignItems': 'flex-start',     # Aligns children to the top of the container (start of the cross-axis)
+                                                        'marginBottom': '20px'          # Adds 20px spacing below this container, useful for separating stacked sections
+                                                      }
+                                            ),
+                                  #Second vertical container storing NIFTY 50 historical performance and current live trends
+                                  html.Div(
+                                  [
+                                                Dashboard.create_dash_candlestick_chart('candlestick-chart1'),
+                                                Dashboard.create_dash_candlestick_chart('candlestick-chart2'),
+                                           ], style={
+                                                        'display': 'flex',              # Activates Flexbox layout, allowing child elements to be aligned and spaced dynamically
+                                                        'flexDirection': 'row',         # Arranges child elements horizontally from left to right
+                                                        'alignItems': 'flex-start',     # Aligns children to the top of the container (start of the cross-axis)
+                                                        'marginBottom': '20px'          # Adds 20px spacing below this container, useful for separating stacked sections
+                                                      },
+                                            ),
+                                  #Third Vertical Container storing line charts of call and Put data of closet 5 strike prices
+                                  html.Div(
+                                  [
+                                                Dashboard.create_price_volume_chart("call_display", focus_call_df_list, "datetime", "close", "volume"),
+                                                Dashboard.create_price_volume_chart("put_display", focus_put_df_list, "datetime", "close", "volume")
+                                          ], style={
+                                                        'display': 'flex',           # Enables Flexbox layout, allowing flexible alignment and spacing of child elements
+                                                        'flexDirection': 'row',      # Arranges child elements in a horizontal line (left to right)
+                                                        'width': '90%'               # Sets the container width to 90% of its parent, leaving some margin on either side
+                                                    },
+
+                                          ),
+                                  #Fourth vertical container for display of Option chain tree and NIFTY 50 Stock dynamics
+                                  html.Div(
+                                  [
+                                                html.Div(
+                                                [
+                                                           html.H2("Option Chain Tree", style={'textAlign': 'center'}),
+                                                           Dashboard.create_dash_table('Option_Chain_Tree', opt_chain_disp_tree_df, "100%", 10),
+                                                         ], style={'flex': '1'}),
+
+                                                html.Div(
+                                                [
+                                                           html.H2("NIFTY Stocks List", style={'textAlign': 'center'}),
+                                                           Dashboard.create_dash_table('NIFTY_Stocks_List', nif_stocks_disp_tree_df, "100%", 10),
+                                                        ], style={'flex': '1'}),
+                                          ], style={
+                                                        'display': 'flex',               # Enables Flexbox layout, allowing flexible arrangement of child elements
+                                                        'flexDirection': 'row',          # Aligns child elements horizontally from left to right
+                                                        'alignItems': 'flex-start',      # Vertically aligns children to the top of the container
+                                                        'justifyContent': 'space-around',# Distributes child elements evenly with space around them (left/right padding between items)
+                                                        'width': '100%',                 # Makes the container span the full width of its parent
+                                                        'marginBottom': '20px'           # Adds spacing below the container to separate it from the next section
+                                                    },
+
+                                            ),
+                                  #Fifth Invisible container used to update entire page at regular interval
+                                  html.Div(
+                                  [
+                                              Dashboard.create_interval('interval-component', 1)
+                                          ], style={
+                                                        'display': 'flex',           # Enables Flexbox layout, allowing child elements to be aligned and spaced dynamically
+                                                        'flexDirection': 'row',      # Arranges child elements horizontally from left to right
+                                                        'width': '90%'               # Sets the container width to 90% of its parent, leaving 10% margin for visual balance or responsiveness
+                                                    },
+                                          ),
+
+                            ]
+                           )
+
+           return layout
+        except:
+
+            return None
+
+
 
     @staticmethod
     def create_checkbox_list(names_list, id_prefix="checkbox", default_checked_list=None):
@@ -83,6 +247,21 @@ class Dashboard():
                 'verticalAlign': 'top'
             }
         )
+    @staticmethod
+    def create_line_plot(chart_id):
+
+
+        return dcc.Graph(
+                            id      =chart_id,
+                            style   ={
+                                        'width': '100%',
+                                        'height': '95%',
+                                        'border': '1px solid gray'
+                                    }
+                        )
+
+
+
 
     @staticmethod
     def create_dual_line_plot_set(count):
@@ -468,70 +647,72 @@ class Dashboard():
         -------
         fig : Plotly candlestick chart figure
         '''
-    
+
+        # Initialize an empty Plotly figure object
         fig = go.Figure()
     
         # Primary candlestick plot
         fig.add_trace(
                         go.Candlestick(
-                                            x=df['datetime'],
-                                            open=df['open'],
-                                            high=df['high'],
-                                            low=df['low'],
-                                            close=df['close'],
-                                            increasing_line_color='green',
-                                            decreasing_line_color='rgb(139, 0, 0)',
-                                            name="OHLC"
+                                            x=df['datetime'],                        # X-axis: datetime values
+                                            open=df['open'],                         # Opening prices
+                                            high=df['high'],                         # High prices
+                                            low=df['low'],                           # Low prices
+                                            close=df['close'],                       # Closing prices
+                                            increasing_line_color='green',           # Color for bullish candles
+                                            decreasing_line_color='rgb(139, 0, 0)',  # Color for bearish candles
+                                            name="OHLC"                              # Legend name
                                         )
                     )
     
             # Area highlight shapes
-        shapes = []
+        shapes = []                 # Initialize list to hold area highlight shapes
         
         if areas:
             for area in areas:
                 shapes.append(
                                 {
-                                'type': 'rect',
-                                'xref': 'paper',
-                                'yref': 'y',
-                                'x0': 0,
-                                'x1': 1,
-                                'y0': area['low'],
-                                'y1': area['high'],
-                                'fillcolor': area['color'],
-                                'layer': 'below',
-                                'line': {'width': 0},
+                                'type': 'rect',                 # Shape type: rectangle
+                                'xref': 'paper',                # X-axis reference: full width of plot
+                                'yref': 'y',                    # Y-axis reference: price axis
+                                'x0': 0,                        # Start at left edge
+                                'x1': 1,                        # End at right edge
+                                'y0': area['low'],              # Bottom of rectangle
+                                'y1': area['high'],             # Top of rectangle
+                                'fillcolor': area['color'],     # Fill color for the area
+                                'layer': 'below',               # Draw below chart elements
+                                'line': {'width': 0},           # No borderline
                                 }
                                 )
     
-        # Base layout
+        # Define base layout properties for the chart
         layout_kwargs = {
-                            'margin': dict(l=0, r=0, t=0, b=0),
-                            'paper_bgcolor': '#fcf6f4',
-                            'plot_bgcolor': '#fcf6f4',
-                            'font': dict(color='black'),
-                            'shapes': shapes,
+                            'margin': dict(l=0, r=0, t=0, b=0), # Remove all margins
+                            'paper_bgcolor': '#fcf6f4',         # Background color of the figure
+                            'plot_bgcolor': '#fcf6f4',          # Background color of the plot area
+                            'font': dict(color='black'),        # Font color
+                            'shapes': shapes,                   # Add any highlight shapes
+
                         }
     
         #IF autofit is not enabled then use simple plotting for primary y-axis else enable autoscale of y-axis
         if not autofit:
     
                       layout_kwargs['yaxis'] = dict(
-                                                        overlaying='y',
-                                                        side='left',
-                                                        showgrid=False
+                                                        overlaying='y',     # Overlay on default Y-axis
+                                                        side='left',        # Position on left side
+                                                        showgrid=False      # Hide grid lines
                                                     )
     
     
         else:
     
                     layout_kwargs['yaxis'] = dict(
-                                                        overlaying='y',
-                                                        side='left',
-                                                        showgrid=False,
-                                                        autorange=True,
-                                                        fixedrange=False
+                                                        overlaying='y',     # Overlay on default Y-axis
+                                                        side='left',        # Position on left side
+                                                        showgrid=False,     # Hide grid lines
+                                                        autorange=True,     # Enable auto-scaling
+                                                        fixedrange=False    # Allow zooming/panning
                                                     )
         # Secondary Y-axis plot (optional)
         if df_secondary_data:
@@ -679,4 +860,174 @@ class Dashboard():
         
         
         
-        
+    @staticmethod
+    def create_price_volume_chart(chart_id, dataframes, x_col, y_col, volume_col):
+        traces = []
+
+        # Define distinct colors for each line/bar pair
+        color_palette = [
+            'rgba(0, 117, 44, 1)',          # Dark Emerald Green
+            'rgba(255, 233, 0, 0.9)',       # Bright Yellow
+            'rgba(0, 117, 179, 0.9)',       # Brilliant Blue
+            'rgba(255, 6, 0, 0.8)',         # Bright Red
+            'rgba(134, 134, 134, 1)'        # Medium Gray
+        ]
+
+        # Filter each DataFrame to keep only the last 10 minutes of data
+        filtered_dataframes = []
+        try:
+            if dataframes.empty:
+                print("⚠️ Skipping: DataFrame is empty")
+                return None  # or just return
+
+        except:
+            if dataframes is None:
+                print("⚠️ Skipping: No Dataframe for plotting")
+                return None  # or just return
+
+
+        # rest of your processing code here
+        for df in dataframes:
+            latest_time    = df[x_col].max()
+            time_threshold = latest_time - timedelta(minutes=10)
+            df_filtered    = df[df[x_col] >= time_threshold]
+            filtered_dataframes.append(df_filtered)
+
+        # Create traces for each filtered DataFrame
+        for i, df in enumerate(filtered_dataframes):
+            color = color_palette[i]
+
+            # Price line trace
+            traces.append(
+                go.Scatter(
+                    x       =   df[x_col],              # X-axis: timestamp
+                    y       =   df[y_col],              # Y-axis: price
+                    mode    =   'lines',                # Display as line chart
+                    name    =   f'Price Line {i + 1}',  # Legend label
+                    line    =   dict(
+                                    color=color,        # Line color
+                                    width=3             # Line thickness
+                                    ),
+                    yaxis   =   'y1',                   # Assign to primary Y-axis
+                    opacity =   0.6                     # Line transparency
+                ))
+
+            # Volume bar trace
+            traces.append(
+                go.Bar(
+                        x           =df[x_col],          # X-axis: timestamp
+                        y           =df[volume_col],     # Y-axis: volume
+                        name        =f'Volume {i + 1}',  # Legend label
+                        yaxis       ='y2',               # Assign to secondary Y-axis
+                        opacity     =0.6,                # Bar transparency
+                        marker      =dict(color=color),  # Bar color
+                        offsetgroup =f'group{i}'         # Grouping for overlay
+                    ))
+
+        # Calculate max price and round up to next multiple of 50
+        max_price = max(df[y_col].max() for df in filtered_dataframes)
+        y_max     = math.ceil(max_price / 50) * 50
+
+        # Calculate max volume and add buffer
+        max_volume = max(df[volume_col].max() for df in filtered_dataframes)
+
+        layout = go.Layout(
+                    title   =chart_id,                      # Chart title
+
+                    # X-axis configuration
+                    xaxis   =dict(
+                                title       =x_col,         # X-axis label
+                                type        ='date',        # Treat x-axis as datetime
+                                tickformat  ='%H:%M',       # Format ticks as hour:minute
+                                dtick       =60000,         # Tick spacing: 1 minute (60,000 ms)
+                                showgrid    =True,          # Enable gridlines
+                                gridcolor   ='lightgrey',   # Gridline color
+                                gridwidth   =0.5            # Gridline thickness
+                            ),
+
+            # Primary Y-axis (price)
+            yaxis=dict(
+                        title           =y_col,         # Y-axis label
+                        range           =[0, y_max],    # Y-axis range from 0 to rounded max
+                        tickmode        ='linear',      # Evenly spaced ticks
+                        tick0           =0,             # Start ticks from 0
+                        dtick           =50,            # Tick spacing: 50 units
+                        showticklabels  =True,          # Show tick labels
+                        tickformat      =',',           # Format numbers with commas
+                        showgrid        =True,          # Enable gridlines
+                        gridcolor       ='lightgrey',   # Gridline color
+                        gridwidth       =0.5            # Gridline thickness
+                    ),
+
+            # Secondary Y-axis (volume)
+            yaxis2=dict(
+                        title       =volume_col,    # Y-axis label
+                        overlaying  ='y',           # Overlay on primary Y-axis
+                        side        ='right',       # Position on right side
+                        showgrid    =True,          # Enable gridlines
+                        tickmode    ='linear',      # Evenly spaced ticks
+                        tick0       =0,             # Start ticks from 0
+                        dtick       =20000,         # Tick spacing: 20,000 units
+                        tickformat  =',',           # Format numbers with commas
+                        range       =[0, max_volume + 20000],  # Y-axis range with buffer
+                        gridcolor   ='lightgrey',   # Gridline color
+                        gridwidth   =0.5            # Gridline thickness
+                    ),
+
+            # Legend configuration
+            legend=dict(
+                        x           =0.5,           # Center horizontally
+                        y           =-0.2,          # Position below plot area
+                        xanchor     ='center',      # Anchor legend to center
+                        orientation ='h'            # Horizontal layout
+                    ),
+
+            # Layout margins
+            margin  =dict(
+                            l=40, r=40, t=40, b=120  # Extra bottom space for legend
+                        ),
+
+            height       =600,                       # Chart height in pixels
+            barmode      ='overlay',                 # Overlay bars on same x-axis
+            plot_bgcolor ='rgba(237, 237, 237, 1)',  # Plot area background
+            paper_bgcolor='rgba(237, 237, 237, 1)'   # Entire figure background
+        )
+
+        return dcc.Graph(id     =chart_id,
+                         figure =go.Figure(data=traces, layout=layout),
+                         style  ={'height': '95%', 'width': '95%', 'border': '1px solid gray'}  # 👈 Chart container styling
+                        )
+    @staticmethod
+    def update_t_count_stats(Time,T_count,t_pipeline):
+
+        temp = pd.DataFrame(columns=['Particulars','Value'])
+
+        try:
+            new_rows = pd.DataFrame([
+                                        {'Particulars': 'Timestamp', 'Value': Time.strftime('%dth %b, %Y %H:%M:%S')},
+                                        {'Particulars': 'Total Count', 'Value': T_count},
+                                        {'Particulars': 'Pipeline Steps', 'Value': ', '.join(map(str, t_pipeline))}
+                                    ])
+
+            temp    = pd.concat([temp, new_rows], ignore_index=True)
+
+            return temp
+
+        except Exception as e:
+
+            print(f"Error updating t_count stats: {e}")
+            return temp
+
+    @staticmethod
+    def compute_profit_and_loss(order_book_df):
+
+        try:
+
+
+            pass
+
+
+        except Exception as e:
+
+
+            return

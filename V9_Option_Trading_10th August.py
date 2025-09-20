@@ -184,6 +184,7 @@ def main():
     start_events['data_archiever'].set()
     start_events['entry_scanner'].set()
     start_events['trade_entry'].set()
+    start_events['program_parameters'].set()
 
     # clear pause execution flag
     pause_events['ticks_manager'].set()
@@ -191,6 +192,7 @@ def main():
     pause_events['data_archiever'].clear()
     pause_events['entry_scanner'].set()
     pause_events['trade_entry'].set()
+    pause_events['program_parameters'].set()
 
     # starting dash app
     txt = "Starting Dash App..."
@@ -403,38 +405,59 @@ class IP():
         return df
 
     @staticmethod
-    def update_parameters(args):
+    def update_parameters_thread(start_thread,pause_thread):
+
+        try:
+
+            t = threading.Thread(IP.update_parameters, args=(start_thread,pause_thread))
+            Global_function.update_thread_list(t,"update_parameter_thread")
+
+            return "Success"
+
+        except Exception as e:
+
+            txt = f'Error while starting update_parameters./nError Details::{e}'
+            Log.error_msg("Red",txt,True)
+
+        finally:
+
+            txt = f'update parameters thread initiated'
+            Log.error_msg("Red",txt,True)
+
+    @staticmethod
+    def update_parameters(start_thread,pause_thread):
         '''args are written to facilitate for loop'''
         try:
 
             global code_end_time
+            txt = f'{Thread_Scheduler.Thread_List.loc["TH2", "Name"]} Thread initiated'
+            Log.info_msg("Green", txt, True)
+
+            start_thread.wait()
+
             txt = f'{Thread_Scheduler.Thread_List.loc["TH2", "Name"]} Thread started'
             Log.info_msg("Green", txt, True)
 
             # check if the flag is set to running state at the time of entry
-            while Thread_Scheduler.Thread_List.loc["TH2", 'En_Flag'] == 0 \
-                    and Thread_Scheduler.Thread_List.loc["TH2", 'Ex_Flag'] == 0 \
-                    and datetime.now().time() < code_end_time:
+            while start_thread.is_set() and datetime.now().time() < code_end_time:
 
+                pause_thread.wait()
 
                 IP.update_entry_and_exit_logic()
 
                 sleep(30)
 
-            Thread_Scheduler.Thread_List.loc["TH2", 'En_Flag'] = 1
-            Thread_Scheduler.Thread_List.loc["TH2", 'Ex_Flag'] = 1
+        except Exception as e:
+
+
+            txt = f'Execution error while updating Input Parameters::/nError Details::{e} /nError Source::{traceback.format_exc()}'
+            Log.error_msg("Yellow", txt, True)
+            return "Success"
+
+        finally:
 
             txt = f'{Thread_Scheduler.Thread_List.loc["TH2", "Name"]} Thread has been terminated succesfully'
             Log.info_msg("Green", txt, True)
-
-        except Exception as e:
-
-            Thread_Scheduler.Thread_List.loc["TH2", 'En_Flag'] = 1
-            Thread_Scheduler.Thread_List.loc["TH2", 'Ex_Flag'] = 1
-
-            txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
-            return "Success"
 
     @staticmethod
     def determine_exit_logic():
@@ -499,6 +522,20 @@ class Option_Chain():
 
         ===============================================================================================================================
         '''
+    @staticmethod
+    def get_focus_list_df(right):
+
+        try:
+            addresses = Option_Chain.SP_df.loc[Option_Chain.SP_df["focus_SP"] == 1, "Address"].tolist()
+            return_df = []
+            return_df = (
+                            [address.call_df_sec for address in addresses]
+                            if right == "call"
+                            else [address.put_df_sec for address in addresses]
+                        )
+        except:
+
+            return []
 
     @staticmethod
     def init_class_variables():
@@ -2078,7 +2115,7 @@ class Option_Chain():
 
         try:
             for index, row in SP_df.iterrows():
-                print(f"DF::{row['Address']} Type::{type(row['Address'])}")
+                #print(f"DF::{row['Address']} Type::{type(row['Address'])}")
                 obj         = row['Address']
                 old_result  = row['call_buy_flag']
                 result      = obj.evaluate_SP_call_buy(evaluation_parameters)
@@ -2119,7 +2156,7 @@ class Option_Chain():
 
         try:
                 for index, row in SP_df.iterrows():
-                    print(f"DF::{row['Address']} Type::{type(row['Address'])}")
+                    #print(f"DF::{row['Address']} Type::{type(row['Address'])}")
                     obj         = row['Address']
                     result      = obj.evaluate_SP_call_sell(evaluation_parameters)
                     old_result  = row['call_sell_flag']
@@ -2160,7 +2197,7 @@ class Option_Chain():
         try:
             for index, row in SP_df.iterrows():
 
-                print(f"DF::{row['Address']} Type::{type(row['Address'])}")
+                #print(f"DF::{row['Address']} Type::{type(row['Address'])}")
                 obj = row['Address']  # Adjust if Address isn't list-like
 
                 result = obj.evaluate_SP_put_sell(evaluation_parameters)
@@ -2201,7 +2238,7 @@ class Option_Chain():
 
         try:
             for index, row in SP_df.iterrows():
-                print(f"DF::{row['Address']} Type::{type(row['Address'])}")
+                #print(f"DF::{row['Address']} Type::{type(row['Address'])}")
                 obj         = row['Address']  # Assumes Address holds a list-like container
                 result      = obj.evaluate_SP_put_buy(evaluation_parameters)
                 old_result  = row['put_buy_flag']
@@ -4398,7 +4435,11 @@ class Display():
         Entry_dropdown_option_df = Dashboard.create_dropdown_list("Entry Logic", 4)
         Exit_dropdown_option_df = Dashboard.create_dropdown_list("Exit Logic", 4)
 
+        focus_call_df_list = Option_Chain.get_focus_list_df("call")
+        focus_put_df_list = Option_Chain.get_focus_list_df("put")
+
         # Layout of the app
+        '''
         app.layout = html.Div(
             [
                 html.Div(
@@ -4509,6 +4550,118 @@ class Display():
 
             ]
         )
+        '''
+        app.layout = html.Div([
+
+            html.Div([
+
+                # Left column: dropdowns and buttons
+                html.Div([
+                    Dashboard.create_dash_label('Label 1', 'New NIFTY Index Data'),
+
+                    Dashboard.create_dash_dropdown("Entry_Logic", Entry_dropdown_option_df, 0),
+                    Dashboard.create_dash_dropdown("Exit_Logic", Exit_dropdown_option_df, 0),
+                ], style={
+                    'display': 'flex',
+                    'flexDirection': 'column',
+                    'alignItems': 'flex-start',
+                    'gap': '10px',
+                    'marginRight': '20px'  # spacing between columns
+                }),
+
+                # Left column: dropdowns and buttons
+                html.Div([
+                    Dashboard.create_dash_buttons('Entry_Block-btn', 'Block Entry'),
+                    Dashboard.create_dash_buttons('Exit_Block-btn', 'Hold all Trades'),
+                    Dashboard.create_dash_buttons('Liquidate_All-btn', 'Liquidate All'),
+                    Dashboard.create_dash_buttons('Code_deactivate-btn', 'Shutdown code'),
+                ], style={
+                    'display': 'flex',
+                    'flexDirection': 'column',
+                    'alignItems': 'flex-start',
+                    'gap': '10px',
+                    'marginRight': '40px'  # spacing between columns
+                }),
+                html.Div([
+
+                    Dashboard.create_dash_table('table_NIFTY_Index', Display.NIFTY_Index_data, "100%", 10),
+                ], style={'display': 'inline-block', 'marginLeft': '10px', 'marginRight': '10px',
+                          'marginBottom': '5px'}),
+
+                html.Div([
+                    Dashboard.create_dash_table('table_NIFTY_Stocks', Display.NIFTY_Stocks_data, "100%", 10),
+                ], style={'display': 'inline-block', 'marginLeft': '10px', 'marginRight': '10px',
+                          'marginBottom': '5px'}),
+
+                # need to Put P&L summary here in df format
+                html.Div([
+                    Dashboard.create_dash_table('table_NIFTY_Stocks', Display.NIFTY_Stocks_data, "100%", 10),
+                ], style={'display': 'inline-block', 'marginLeft': '10px', 'marginRight': '10px',
+                          'marginBottom': '5px'}),
+            ], style={
+                'display': 'flex',
+                'flexDirection': 'row',
+                'alignItems': 'flex-start',
+                'marginBottom': '20px'
+            }),
+
+            html.Div([
+                Dashboard.create_dash_candlestick_chart('candlestick-chart1'),
+                Dashboard.create_dash_candlestick_chart('candlestick-chart2'),
+            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '90%'}),
+
+            html.Div([
+                dcc.Checklist(
+                    options=[{'label': 'Freeze_Focus_List_Update', 'value': True}],
+                    id='Freeze_Focus_List_Update',
+                    value=[],
+                    style={
+                        'margin-bottom': '5px',
+                        'fontSize': '15px',
+                        'color': 'white',
+                        'transform': 'scale(1.5)'
+                    },
+                    inputStyle={'margin-right': '10px'}
+                ),
+            ], style={
+                'display': 'flex',
+                'justifyContent': 'center',
+                'alignItems': 'center',
+                'width': '90%',
+                'marginTop': '15px',
+                'marginBottom': '15px',
+                'padding': '15px',
+                'border': '2px solid grey',
+                'backgroundColor': '#2C5F2D',
+                'borderRadius': '5px'
+            }),
+
+
+            # html.Div([
+            #    Dashboard.create_dual_line_plot_set(plot_count),
+            # ], style={'display': 'flex', 'flexDirection': 'row', 'width': '90%'}),
+            html.Div([
+                Dashboard.create_price_volume_chart("call_display", focus_call_df_list, "timestamp", "price", "volume"),
+                Dashboard.create_price_volume_chart("put_display", focus_put_df_list, "timestamp", "price", "volume")
+            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '90%'}),
+
+            html.Div([
+                html.Div([
+                    html.H2("Option Chain Tree", style={'textAlign': 'center'}),
+                    Dashboard.create_dash_table('Option_Chain_Tree', Option_Chain.SP_df, "100%", 10),
+                ], style={'flex': '1'}),
+
+                html.Div([
+                    html.H2("NIFTY Stocks List", style={'textAlign': 'center'}),
+                    Dashboard.create_dash_table('NIFTY_Stocks_List', NIFTY_Stocks.stock_list, "100%", 10),
+                ], style={'flex': '1'}),
+            ], style={'display': 'flex', 'flexDirection': 'row', 'alignItems': 'flex-start',
+                      'justifyContent': 'space-around', 'width': '100%', 'marginBottom': '20px'}),
+
+            html.Div([
+                Dashboard.create_interval('interval-component', 1)
+            ], style={'display': 'flex', 'flexDirection': 'row', 'width': '90%'})
+        ])
 
         def update_charts(En_fun_sel, Ex_fun_sel, En_blk_btn, Ex_blk_btn, Liq_all_btn, de_act_btn, Frz_fcs_Lst_Updte,
                           n_intervals, relayout_data1, relayout_data2, *checkbox_values):
@@ -4561,7 +4714,7 @@ class Display():
 
             else:
 
-                print(f'some other tirgger has been activated')
+                print(f'some other trigger has been activated')
 
                 return [dash.no_update] * 13
 
@@ -5134,7 +5287,7 @@ class Entry_Scanners():
     @staticmethod
     def PE_vol_price_action_confirmation(put_df, evaluation_parameters):
 
-        print(f"Put price parameters::{evaluation_parameters}")
+        #print(f"Put price parameters::{evaluation_parameters}")
         '''
         Parameters
         ----------

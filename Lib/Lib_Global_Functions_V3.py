@@ -906,5 +906,3 @@ class Global_function():
            return f"Error resetting flags: {e}"
 
 
-
-a   = Global_function.read_NIFTY_preopen()

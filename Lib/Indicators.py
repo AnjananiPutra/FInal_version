@@ -356,7 +356,7 @@ class Indicators(object):
             print(f"Error in get_option_greeks: {e}")
             return []
 
-
+    @staticmethod
     def generate_ohlc_data(
             min_price: float,
             max_price: float,
@@ -401,8 +401,6 @@ class Indicators(object):
         })
 
         return ohlc_df
-
-
 
 '''
 nifty_df = Indicators.generate_ohlc_data(min_price=24350, max_price=24450, start_datetime=datetime(2025, 8, 9), frequency="1min",num_candles=20)
