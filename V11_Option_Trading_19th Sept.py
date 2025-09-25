@@ -236,7 +236,6 @@ def main():
             Log.info_msg("Green",txt,True)
 
 
-
         except KeyboardInterrupt:
 
             for Th_no in Thread_Scheduler.Thread_List.index:
@@ -4163,14 +4162,14 @@ class Display():
                                             "Profits": ["Weekly Profit", "Day Profit", "Current Holding Profit"],
                                             "Value": [0, 0, 0]
                                         })
-    greeks_table          =  pd.DataFrame({
+    greeks_table          =  pd.DataFrame({ "OI" :[19500, 19600, 19700, 19800, 19900],
+                                            "IV (%)": [12.5, 13.0, 13.3, 12.8, 12.2],
                                             "strike_price": [19500, 19600, 19700, 19800, 19900],
                                             "delta": [0.62, 0.55, 0.48, 0.40, 0.32],
                                             "gamma": [0.012, 0.015, 0.018, 0.016, 0.013],
                                             "theta": [-6.5, -6.2, -6.0, -5.8, -5.6],
                                             "vega": [45, 50, 53, 49, 44],
                                             "rho": [22, 21, 20, 19, 18],
-                                            "IV (%)": [12.5, 13.0, 13.3, 12.8, 12.2]
                                         })
 
     Trigger_list        = pd.DataFrame(columns=['datetime', 'Active_Logic', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8'])
@@ -4244,22 +4243,22 @@ class Display():
             global queue_length
 
             # calculating revised NIFTY_Index_table_value
-            #NIFTY_Index_table = Dashboard.prepare_table_nif_value(NIFTY_Index.daily_df,NIFTY_Index.current_val)
+            NIFTY_Index_table = Dashboard.prepare_table_nif_value(NIFTY_Index.daily_df,NIFTY_Index.current_val)
             #txt = f'NIFTY_Index_table Type::{type(NIFTY_Index_table)} \n Data::{NIFTY_Index_table}'
             #Log.info_msg("Green",txt,True)
             #NIFTY_Index_table = dash.no_update
 
             #tick_Statistics
             tick_stats_table  = Dashboard.prepare_table_tick_stats(queue_length,Ticks.tick_count)
-            txt = f'tick_stats_table Type::{type(tick_stats_table)} \n Data::{tick_stats_table}'
-            Log.info_msg("Green", txt, True)
+            #txt = f'tick_stats_table Type::{type(tick_stats_table)} \n Data::{tick_stats_table}'
+            #Log.info_msg("Green", txt, True)
 
             #tick_stats_table = dash.no_update
             #update_NIFTY_VWAP table data
             Display.update_VWAP()
-            NIFTY_vwap_table = Dashboard.publish_table(Display.NIFTY_Stocks_data)
-            txt = f'NIFTY_vwap_table Type::{type(NIFTY_vwap_table)} \n Data::{NIFTY_vwap_table}'
-            Log.info_msg("Green", txt, True)
+            NIFTY_vwap_table = Display.NIFTY_Stocks_data
+            #txt = f'NIFTY_vwap_table Type::{type(NIFTY_vwap_table)} \n Data::{NIFTY_vwap_table}'
+            #Log.info_msg("Green", txt, True)
 
             #NIFTY_vwap_table = dash.no_update
             #update P_and_L table data
@@ -4311,9 +4310,9 @@ class Display():
             txt = f'stock_list Type::{type(stock_list)} \n Data::{stock_list}'
             Log.info_msg("Green", txt, True)
 
-            return (Dashboard.publish_table(Display.NIFTY_Index_data),          #1
-                    tick_stats_table,           #2
-                    NIFTY_vwap_table,           #3
+            return (Dashboard.publish_table(NIFTY_Index_table),          #1
+                    Dashboard.publish_table(tick_stats_table),           #2
+                    Dashboard.publish_table(NIFTY_vwap_table),           #3
                     P_and_L_table,              #4
                     candlestick_fig1,           #5
                     candlestick_fig2,           #6
@@ -4334,126 +4333,7 @@ class Display():
             # Return no_update for all 13 outputs to avoid error
             return [dash.no_update] * 13
 
-    @classmethod
-    def update_charts_button_click(cls, Entry_Block_btn, Exit_Block_btn, Liquidate_All_btn, Code_deactivate_btn):
 
-        # Your logic for updating charts based on button clicks
-        # ...
-        # global submit_button_clicks
-        # buttons keep incrementing the counter automatically once triggered
-
-        row = len(Display.button_count)
-
-        # Step 1: Log the button states into the DataFrame
-        current_index = len(Display.button_count)
-
-        Display.button_count.loc[current_index] = {
-            'Entry_Block_btn': Entry_Block_btn,
-            'Exit_Block_btn': Exit_Block_btn,
-            'Liquidate_All_btn': Liquidate_All_btn,
-            'Code_deactivate_btn': Code_deactivate_btn
-        }
-
-        # Step 2: Define the logic for detecting new clicks
-        def is_new_click(button_name):
-            if current_index == 0:
-                return True  # First row — treat all buttons as newly clicked
-            return Display.button_count[button_name].iloc[current_index] > Display.button_count[button_name].iloc[
-                current_index - 1]
-
-        # Step 3: Handle each button click individually
-
-        # Entry Block button
-        if is_new_click('Entry_Block_btn'):
-            entry_active = Entry_Block_btn % 2 != 0
-            IP.ctrl_ptrs.loc[-1, 'Call_Entry'] = int(entry_active)
-            IP.ctrl_ptrs.loc[-1, 'Put_Entry'] = int(entry_active)
-            print(
-                f"{'Call & Put entry block activated' if entry_active else 'Call & Put entry block deactivated'} : {Entry_Block_btn}")
-
-        # Exit Block button
-        if is_new_click('Exit_Block_btn'):
-            exit_active = Exit_Block_btn % 2 != 0
-            IP.ctrl_ptrs.loc[-1, 'Call_Exit'] = int(exit_active)
-            IP.ctrl_ptrs.loc[-1, 'Put_Exit'] = int(exit_active)
-            print(
-                f"{'Call & Put exit block activated' if exit_active else 'Call & Put exit block deactivated'} : {Exit_Block_btn}")
-
-        # Code Shutdown button
-        if is_new_click('Code_deactivate_btn'):
-            shutdown_active = Code_deactivate_btn % 2 != 0
-            IP.ctrl_ptrs.loc[-1, 'Main_Program'] = int(shutdown_active)
-            print(
-                f"{'Code standby mode activated' if shutdown_active else 'Code standby mode deactivated'} : {Code_deactivate_btn}")
-
-        # Liquidate All button
-        if is_new_click('Liquidate_All_btn'):
-            liquidate_active = Liquidate_All_btn % 2 != 0
-            Exit_Scanners.square_off_all_holdings()
-
-            #IP.ctrl_ptrs.loc[-1, 'Liquidate'] = int(liquidate_active)
-            print(
-                f"{'Liquidate all assets activated' if liquidate_active else 'Liquidate all assets deactivated'} : {Liquidate_All_btn}")
-
-        return
-
-    @staticmethod
-    def update_check_box_values(*checkbox_value):
-
-        SP_obj_list = Option_Chain.SP_df[Option_Chain.SP_df['focus_SP'] == True]['Address'].head(5)
-
-        print(f'check box update function activated')
-        print(f'{checkbox_value}')
-
-        if len(SP_obj_list) > 0:
-
-            for i in range(0, len(SP_obj_list), 1):
-
-                if isinstance(SP_obj_list[i].call_df_sec, pd.DataFrame):
-
-                    status = Global_function.update_SP_flags(SP_obj_list[i], checkbox_value[i * 4],
-                                                             checkbox_value[i * 4 + 1], checkbox_value[i * 4 + 2],
-                                                             checkbox_value[i * 4 + 3])
-                    Log.info_msg("Green", status, True)
-
-                else:
-
-                    txt = f"Focus object list is invalid :: {SP_obj_list[i].strike_price}"
-
-                    Log.info_msg("Green", txt, True)
-
-
-
-        else:
-
-            txt = f"Focus_SP_List is empty"
-            Log.info_msg("Green", txt, True)
-
-        return "Success"
-
-    @staticmethod
-    def update_active_logic(entry_func_dropdown_val, exit_func_dropdown_val):
-
-        print(f'Active Entry Logic is {entry_func_dropdown_val} and Active Exit Logic is {exit_func_dropdown_val}')
-
-        # current entry logic
-        Active_en_logic = IP.ctrl_ptrs['Active_Entry_Logic'].iloc[-1]
-        Active_ex_logic = IP.ctrl_ptrs['Active_Exit_Logic'].iloc[-1]
-        df = pd.DataFrame(columns=IP.ctrl_ptrs.columns)
-
-        df.loc[0, 'datetime'] = datetime.now().replace(microsecond=0)
-
-        # Check if new selected entry logic is not the same as old logic
-        C1 = Active_en_logic != entry_func_dropdown_val
-        C2 = Active_ex_logic != exit_func_dropdown_val
-
-        if C1 == True or C2 == True:
-            df.loc[0, 'Active_Entry_Logic'] = entry_func_dropdown_val
-            df.loc[0, 'Active_Exit_Logic'] = exit_func_dropdown_val
-
-            IP.ctrl_ptrs = pd.concat([IP.ctrl_ptrs, df], ignore_index=True, sort=False)
-
-        return "Success"
 
     @staticmethod
     def built_dashboard():
@@ -4532,14 +4412,36 @@ class Display():
                 return Display.update_charts_n_intervals(relayout_data1, relayout_data2)
 
 
-            elif trigger_id in ['Select_logic-btn', 'Entry_Block-btn', 'Exit_Block-btn', 'Liquidate_All-btn',
-                                'Code_deactivate-btn']:
-
-                print(f'printing based on button press')
-                return_value2 = Display.update_charts_button_click(En_blk_btn, Ex_blk_btn, Liq_all_btn, de_act_btn)
-
                 return [dash.no_update] * 13
 
+            elif trigger_id in ['Entry_Block-btn']:
+
+                txt = f'change the Entry flag to disabled mode'
+
+                if Entry_Scanners.entry_flag == True:
+
+                        Entry_Scanners.entry_flag = False
+                        Log.debug_msg("Blue",f"New option buying blocked",True)
+
+                elif Entry_Scanners.entry_flag == False:
+
+                    Entry_Scanners.entry_flag = True
+                    Log.debug_msg("Blue", f"New option buying enabled", True)
+
+
+
+
+            elif trigger_id in [ 'Exit_Block-btn']:
+
+                txt = f'change the Exit flag to disabled mode'
+
+            elif trigger_id in [ 'Sq_off_Block-btn']:
+
+                txt = f'change the Sq_off flag to disabled mode'
+
+            elif trigger_id in ['Shutdown-btn']:
+
+                txt = f'start the shutdown process'
 
             elif trigger_id in ['Entry_Logic', 'Exit_Logic']:
 
@@ -4548,17 +4450,21 @@ class Display():
 
                 return [dash.no_update] * 13
 
-            elif trigger_id in ['Freeze_Focus_List_Update']:
+            elif trigger_id in ['strike_price_list','right_list']:
 
-                print(f'Focus SP List Freezed')
+                txt = "Run estimate of qty that shall be kept"
 
                 return [dash.no_update] * 13
+
+            elif trigger_id in ['manual_order']:
+
+                txt = 'Run execute order code'
 
             else:
 
                 print(f'some other trigger has been activated')
 
-                return [dash.no_update] * 11
+                return [dash.no_update] * 13
 
             return
 
@@ -4610,7 +4516,9 @@ class Display():
 
 
 class Entry_Scanners():
+
     dic = []
+    entry_flag = False
 
     def __init__(self, OC_object, right, T_count, quantity):
 

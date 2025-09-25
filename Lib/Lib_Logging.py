@@ -74,7 +74,7 @@ class Log():
         
         # Logging functions
         @staticmethod
-        def debug_msg(colour_name,msg,display_flag):
+        def debug_msg(colour_name="Blue",msg=None,display_flag=False):
             
             logger = Log.setup_logger("DEBUG")
             logger.debug(msg)
@@ -83,7 +83,7 @@ class Log():
                 print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}")
 
         @staticmethod
-        def info_msg(colour_name='White',msg=None,display_flag=False):
+        def info_msg(colour_name='Green',msg=None,display_flag=False):
             logger = Log.setup_logger("INFO")
             logger.info(msg)
             logger.debug(msg)
@@ -92,7 +92,7 @@ class Log():
                 print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}",flush=True)
 
         @staticmethod
-        def warning_msg(colour_name,msg,display_flag):
+        def warning_msg(colour_name="Yellow",msg=None,display_flag=False):
             
             logger = Log.setup_logger("WARNING")
             logger.warning(msg)
@@ -103,7 +103,7 @@ class Log():
                 print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}",flush=True)
 
         @staticmethod
-        def error_msg(colour_name,msg,display_flag):
+        def error_msg(colour_name="Red",msg=None,display_flag=False):
             
             logger = Log.setup_logger("ERROR")
             logger.error(msg)
@@ -115,7 +115,7 @@ class Log():
                 print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}",flush=True)
 
         @staticmethod
-        def critical_msg(colour_name,msg,display_flag):
+        def critical_msg(colour_name="Cyan",msg=None,display_flag=False):
             
             
             logger = Log.setup_logger("CRITICAL")

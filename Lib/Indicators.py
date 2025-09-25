@@ -10,6 +10,7 @@ from math import sqrt, log, exp
 from scipy.optimize import brentq
 from plotly.graph_objs import Indicator
 from datetime import datetime, date, time, timedelta
+import traceback
 
 class Indicators(object):
 
@@ -244,85 +245,120 @@ class Indicators(object):
             pass
 
     @staticmethod
-    def option_greeks_iv(Spot_price_S, Strike_price_K, Time_to_expiry_T, LT_price, option_type='call',
-                         risk_free_rate_r=0.06):
+    def option_greeks_iv(Spot_price_S, Strike_price_K, Time_to_expiry_T, LT_price,
+                         option_type='call', risk_free_rate_r=0.06):
         """
         Calculate option Greeks and implied volatility using the Black-Scholes model.
 
-        Parameters:
-        - Spot_price_S: Spot price of the underlying asset
-        - Strike_price_K: Strike price of the option
-        - Time_to_expiry_T: Time to expiry in years (if 0, it will be recalculated)
-        - LT_price: Observed market premium of the option
-        - option_type: 'call' or 'put'
-        - risk_free_rate_r: Annualized risk-free interest rate (default = 6%)
+        Parameters
+        ----------
+        Spot_price_S : float
+            Current price of the underlying asset
+        Strike_price_K : float
+            Strike price of the option
+        Time_to_expiry_T : float
+            Time to expiry in years (fractional)
+        LT_price : float
+            Observed market option premium
+        option_type : str
+            'call' or 'put' (also accepts 'CE'/'PE')
+        risk_free_rate_r : float
+            Annualized risk-free interest rate (default = 6%)
 
-        Returns:
-        Dictionary with IV, Delta, Gamma, Theta, Vega, and Rho
+        Returns
+        -------
+        dict
+            Option Greeks: IV, delta, gamma, theta, vega, rho
+            If IV cannot be computed, all values are None
         """
 
-        # Recalculate time to expiry if T is zero
-        if Time_to_expiry_T == 0:
-            now                 = datetime.now()
-            expiry_time         = datetime.combine(now.date(), time(15, 30))  # 3:30 PM IST
-            minutes_remaining   = max((expiry_time - now).total_seconds() / 60, 1)  # avoid zero
-            Time_to_expiry_T    = minutes_remaining / 525600  # convert minutes to fractional years
+        from scipy.stats import norm
+        from math import log, sqrt, exp
+        from scipy.optimize import brentq
 
-        # Black-Scholes pricing function
+        # -------------------------------
+        # 1. Ensure Time_to_expiry_T is positive
+        # -------------------------------
+        if Time_to_expiry_T <= 0:
+            # If T is zero or negative, assign a tiny fraction of a year
+            Time_to_expiry_T = 1e-5  # avoid division by zero
+
+        # -------------------------------
+        # 2. Black-Scholes pricing function
+        # -------------------------------
         def bs_price(sigma):
-
-            d1 = (  log(Spot_price_S / Strike_price_K) +
-                    (risk_free_rate_r + 0.5 * sigma ** 2) * Time_to_expiry_T) / (
-                    sigma * sqrt(Time_to_expiry_T))
-
+            """
+            Computes theoretical option price for given volatility sigma using Black-Scholes formula
+            """
+            d1 = (log(Spot_price_S / Strike_price_K) +
+                  (risk_free_rate_r + 0.5 * sigma ** 2) * Time_to_expiry_T) / (
+                         sigma * sqrt(Time_to_expiry_T))
             d2 = d1 - sigma * sqrt(Time_to_expiry_T)
 
-            if option_type == 'call':
+            # Correct option type check
+            if option_type in ['call', 'CE']:
                 return Spot_price_S * norm.cdf(d1) - Strike_price_K * exp(
                     -risk_free_rate_r * Time_to_expiry_T) * norm.cdf(d2)
             else:
                 return Strike_price_K * exp(-risk_free_rate_r * Time_to_expiry_T) * norm.cdf(
                     -d2) - Spot_price_S * norm.cdf(-d1)
 
-        # The Estimate implied volatility using Brent's method
+        # -------------------------------
+        # 3. Safely estimate implied volatility using Brent's method
+        # -------------------------------
         try:
-            iv = brentq(lambda sigma: bs_price(sigma) - LT_price, 0.0001, 5)
-        except ValueError:
-            return {
-                "IV": None, "Delta": None, "Gamma": None,
-                "Theta": None, "Vega": None, "Rho": None
-            }
+            # Evaluate BS price at lower and upper bounds
+            f_low = bs_price(0.0001) - LT_price
+            f_high = bs_price(5) - LT_price
 
-        # Calculate d1 and d2 using implied volatility
+            # Check if function crosses zero in the interval [0.0001, 5]
+            if f_low * f_high > 0:
+                # Function does not cross zero → IV cannot be computed
+                return {"IV": None, "delta": None, "gamma": None, "theta": None, "vega": None, "rho": None}
+
+            # Solve for implied volatility
+            iv = brentq(lambda sigma: bs_price(sigma) - LT_price, 0.0001, 5)
+
+        except Exception:
+            # Any error during root-finding returns None for all Greeks
+            return {"IV": None, "delta": None, "gamma": None, "theta": None, "vega": None, "rho": None}
+
+        # -------------------------------
+        # 4. Compute d1 and d2 using obtained IV
+        # -------------------------------
         d1 = (log(Spot_price_S / Strike_price_K) + (risk_free_rate_r + 0.5 * iv ** 2) * Time_to_expiry_T) / (
                     iv * sqrt(Time_to_expiry_T))
         d2 = d1 - iv * sqrt(Time_to_expiry_T)
 
-        # Compute Greeks
-        gamma = norm.pdf(d1) / (Spot_price_S * iv * sqrt(Time_to_expiry_T))
-        vega = Spot_price_S * norm.pdf(d1) * sqrt(Time_to_expiry_T) / 100
+        # -------------------------------
+        # 5. Compute Greeks
+        # -------------------------------
+        gamma = norm.pdf(d1) / (Spot_price_S * iv * sqrt(Time_to_expiry_T))  # sensitivity to underlying price
+        vega = Spot_price_S * norm.pdf(d1) * sqrt(Time_to_expiry_T) / 100  # sensitivity to volatility
 
-        if option_type == 'call':
-            delta = norm.cdf(d1)
-            theta = (-Spot_price_S * norm.pdf(d1) * iv / (
-                        2 * sqrt(Time_to_expiry_T)) - risk_free_rate_r * Strike_price_K * exp(
-                -risk_free_rate_r * Time_to_expiry_T) * norm.cdf(d2)) / 365
+        if option_type in ['call', 'CE']:
+            delta = norm.cdf(d1)  # directional sensitivity
+            theta = (-Spot_price_S * norm.pdf(d1) * iv / (2 * sqrt(Time_to_expiry_T))
+                     - risk_free_rate_r * Strike_price_K * exp(-risk_free_rate_r * Time_to_expiry_T) * norm.cdf(
+                        d2)) / 365
             rho = Strike_price_K * Time_to_expiry_T * exp(-risk_free_rate_r * Time_to_expiry_T) * norm.cdf(d2) / 100
         else:
             delta = -norm.cdf(-d1)
-            theta = (-Spot_price_S * norm.pdf(d1) * iv / (
-                        2 * sqrt(Time_to_expiry_T)) + risk_free_rate_r * Strike_price_K * exp(
-                -risk_free_rate_r * Time_to_expiry_T) * norm.cdf(-d2)) / 365
+            theta = (-Spot_price_S * norm.pdf(d1) * iv / (2 * sqrt(Time_to_expiry_T))
+                     + risk_free_rate_r * Strike_price_K * exp(-risk_free_rate_r * Time_to_expiry_T) * norm.cdf(
+                        -d2)) / 365
             rho = -Strike_price_K * Time_to_expiry_T * exp(-risk_free_rate_r * Time_to_expiry_T) * norm.cdf(-d2) / 100
 
-        # Return rounded results
+        # -------------------------------
+        # 6. Return rounded Greeks
+        # -------------------------------
         return {
-            "IV": round(iv * 100, 2),
-            "Delta": round(delta, 4),
-            "Gamma": round(gamma, 4),
-            "Theta": round(theta, 4),
-            "Vega": round(vega, 4),
-            "Rho": round(rho, 4)
+            "IV": round(iv * 100, 2),  # implied volatility in %
+            "delta": round(delta, 4),
+            "gamma": round(gamma, 4),
+            "theta": round(theta, 4),
+            "vega": round(vega, 4),
+            "rho": round(rho, 4)
         }
 
     @staticmethod
@@ -332,9 +368,9 @@ class Indicators(object):
             outcome     =   []
             for each_obj in obj_list:
 
-                price_df_sec        =  each_obj.call_df_sec if right =='call' else each_obj.put_df_sec
+                price_df_sec        = each_obj.call_df_sec if right =='call' else each_obj.put_df_sec
                 Spot_price_S        = nifty_df_sec['close'].iloc[-1]                           # Spot price
-                Strike_price_K      = each_obj.strike_price                                        # Strike price (choose based on strategy)
+                Strike_price_K      = each_obj.strike_price                                    # Strike price (choose based on strategy)
                 Time_to_expiry_T    = (expiry_date.date() - datetime.now().date()).days / 365  # Time to expiry (7 days)
                 risk_free_return_r  = 0.06                                                     # Risk-free rate (approximate annual)
                 LT_price            = price_df_sec['close'].iloc[-1]                           # Option premium (example)

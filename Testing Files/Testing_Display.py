@@ -1,19 +1,41 @@
-import datetime
-from datetime import datetime
 import dash
-from dash import html
-import pandas as pd
-from Lib.Lib_Create_Dashboard_v6_Dash import Dashboard
+from dash import html, dcc
 
-# Step 1: Create dummy DataFrames for testing
-dummy_df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})
-dummy_dropdown_df = pd.DataFrame({'label': ['Logic A', 'Logic B'], 'value': ['A', 'B']})
-strike_price_list = pd.DataFrame({'label': ['17500', '17600', '17700'], 'value': ['17500', '17600', '17700']})
+app = dash.Dash(__name__)
 
-result_df       =  pd.DataFrame([{'Current Time': datetime.now().strftime("%d-%b-%Y %H:%M:%S"),  # e.g., 25-Sep-2025 15:32:19
-                                  'T_Count': '1,222',
-                                  'Queue Length': '0'
-                                 }
-                                ])
+app.layout = html.Div([
 
-print(result_df)
+    # Fixed header
+    html.Div(
+        "📌 Fixed Header (always visible)",
+        style={
+            "position": "fixed",   # ✅ Fix relative to viewport
+            "top": "0",
+            "left": "0",
+            "right": "0",
+            "height": "60px",
+            "background": "#f8f9fa",
+            "boxShadow": "0 2px 5px rgba(0,0,0,0.1)",
+            "zIndex": "1000",      # ✅ ensure it sits above other content
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "fontWeight": "bold",
+            "fontSize": "20px"
+        }
+    ),
+
+    # Scrollable content
+    html.Div(
+        children=[
+            html.H2("Scrollable Content Section"),
+            html.P("This section scrolls while the header stays fixed.")]*50,
+        style={
+            "marginTop": "70px",   # ✅ leave space for header
+            "padding": "20px"
+        }
+    )
+])
+
+if __name__ == "__main__":
+    app.run(debug=True)
