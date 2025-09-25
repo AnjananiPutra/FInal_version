@@ -805,7 +805,7 @@ class Global_function():
           counter   =   0  
           df        =   pd.DataFrame()
 
-          while len(df) < 50 and counter < 5:
+          while len(df) < 50 and counter < 2:
               
               print(f"Attempt {counter}: Reading the Pre-open market data of NIFTY 50 ")
               df    =   Global_function.read_NIFTY_preopen()

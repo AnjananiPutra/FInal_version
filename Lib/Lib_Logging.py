@@ -12,6 +12,7 @@ CRITICAL:  Cyan
 
 '''
 
+
 class Log():
 
         font_colour           =   {"Black"       : "\033[30m","Red"           : "\033[31m","Green"        : "\033[32m",
@@ -82,7 +83,7 @@ class Log():
                 print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}")
 
         @staticmethod
-        def info_msg(colour_name,msg,display_flag):
+        def info_msg(colour_name='White',msg=None,display_flag=False):
             logger = Log.setup_logger("INFO")
             logger.info(msg)
             logger.debug(msg)
@@ -99,7 +100,7 @@ class Log():
             logger.debug(msg)
         
             if display_flag  ==   True:
-                print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}")
+                print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}",flush=True)
 
         @staticmethod
         def error_msg(colour_name,msg,display_flag):
@@ -111,7 +112,7 @@ class Log():
             logger.debug(msg)
 
             if display_flag  ==   True:
-                print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}")
+                print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}",flush=True)
 
         @staticmethod
         def critical_msg(colour_name,msg,display_flag):
@@ -125,4 +126,4 @@ class Log():
             logger.debug(msg)
 
             if display_flag  ==   True:
-                print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}")
+                print(f"{Log.Bold}{Log.font_colour[colour_name]}{msg}{Log.RESET}",flush=True)

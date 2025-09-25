@@ -1,0 +1,178 @@
+Display ID              Object Type         Input/Output        Response Function
+table_nif_value             Table            Output             prepare_table_nif_value(done)
+Entry_Logic                 Dropdown         Input
+Exit_logic                  Dropdown         Input
+Entry_Block-btn             Button           Input
+Sq_off_Block-btn            Button           Input
+Liquidate_All-btn           Button           Input
+Shutdown-btn                Button           Input
+table_tick_stats            Table            Output             prepare_table_tick_stats(done)
+table_NIFTY_vwap            Table            Output             prepare_table_nifty_vwap(pending)
+table_P_and_L               Table            Output             prepare_table_P_and_L(done)
+strike_price_list           Dropdown         Input
+right_list                  Dropdown         Input
+qty_list                    Dropdown         Input
+manual_order                Button           Input
+candlestick-chart1          chart            Output             plot_candlestick_chart(done)
+candlestick-chart2          chart            Output             plot_candlestick_chart(done)
+call_display                chart            Output             plot_price_volume_chart(done)
+put_display                 chart            Output             plot_price_volume_chart(done)
+call_focus_table            chart            Output             prepare_table_option_greeks(done)
+put_focus_table             chart            Output             prepare_table_option_greeks(done)
+Active_order_list           Table            Output             prepare_table_active_orders(done)
+Option_Chain_Tree           Table            Output             prepare_table_option_chain_tree(done)
+NIFTY_Stocks_List           Table            Output             prepare_table_nif_stocks(pending)
+
+
+sub-process to update
+def update_charts_n_intervals(cls, relayout_data1, relayout_data2): done
+prepare_table_nif_value(nif_daily_df,nif_current_val)   done
+prepare_table_tick_stats(queue_length, T_Count)
+prepare_table_nifty_vwap(update_VWAP(NIFTY_Stocks.VWAP_indicator
+prepare_table_P_and_L(Active_order_list,Order_history)
+plot_candlestick_chart(df, x_range1=None, areas=None, x_range=None, y_range=None,
+                               df_secondary_data=None, autofit=False)
+plot_price_volume_chart(dataframes, x_col, y_col, volume_col)
+prepare_table_option_greeks(*dfs)
+prepare_table_active_orders(order_df)
+prepare_table_option_tree(call_df_list, put_df_list)
+prepare_table_nif_stocks(NIFTY_Stocks.stock_list)
+
+
+
+
+    @staticmethod
+    def plot_price_volume_chart(dataframes, x_col, y_col, volume_col):
+
+        traces = []
+
+        # Define distinct colors for each line/bar pair
+        color_palette = [
+            'rgba(0, 117, 44, 1)',          # Dark Emerald Green
+            'rgba(255, 233, 0, 0.9)',       # Bright Yellow
+            'rgba(0, 117, 179, 0.9)',       # Brilliant Blue
+            'rgba(255, 6, 0, 0.8)',         # Bright Red
+            'rgba(134, 134, 134, 1)'        # Medium Gray
+        ]
+
+        # Filter each DataFrame to keep only the last 10 minutes of data
+        filtered_dataframes = []
+        try:
+            if dataframes.empty:
+                print("⚠️ Skipping: DataFrame is empty")
+                return None  # or just return
+
+        except:
+            if dataframes is None:
+                print("⚠️ Skipping: No Dataframe for plotting")
+                return None  # or just return
+
+
+        # rest of your processing code here
+        for df in dataframes:
+            latest_time    = df[x_col].max()
+            time_threshold = latest_time - timedelta(minutes=10)
+            df_filtered    = df[df[x_col] >= time_threshold]
+            filtered_dataframes.append(df_filtered)
+
+        # Create traces for each filtered DataFrame
+        for i, df in enumerate(filtered_dataframes):
+            color = color_palette[i]
+
+            # Price line trace
+            traces.append(
+                go.Scatter(
+                    x       =   df[x_col],              # X-axis: timestamp
+                    y       =   df[y_col],              # Y-axis: price
+                    mode    =   'lines',                # Display as line chart
+                    name    =   f'Price Line {i + 1}',  # Legend label
+                    line    =   dict(
+                                    color=color,        # Line color
+                                    width=3             # Line thickness
+                                    ),
+                    yaxis   =   'y1',                   # Assign to primary Y-axis
+                    opacity =   0.6                     # Line transparency
+                ))
+
+            # Volume bar trace
+            traces.append(
+                go.Bar(
+                        x           =df[x_col],          # X-axis: timestamp
+                        y           =df[volume_col],     # Y-axis: volume
+                        name        =f'Volume {i + 1}',  # Legend label
+                        yaxis       ='y2',               # Assign to secondary Y-axis
+                        opacity     =0.6,                # Bar transparency
+                        marker      =dict(color=color),  # Bar color
+                        offsetgroup =f'group{i}'         # Grouping for overlay
+                    ))
+
+        # Calculate max price and round up to next multiple of 50
+        max_price = max(df[y_col].max() for df in filtered_dataframes)
+        y_max     = math.ceil(max_price / 50) * 50
+
+        # Calculate max volume and add buffer
+        max_volume = max(df[volume_col].max() for df in filtered_dataframes)
+
+        layout = go.Layout(
+                    #title   =chart_id,                      # Chart title
+
+                    # X-axis configuration
+                    xaxis   =dict(
+                                title       =x_col,         # X-axis label
+                                type        ='date',        # Treat x-axis as datetime
+                                tickformat  ='%H:%M',       # Format ticks as hour:minute
+                                dtick       =60000,         # Tick spacing: 1 minute (60,000 ms)
+                                showgrid    =True,          # Enable gridlines
+                                gridcolor   ='lightgrey',   # Gridline color
+                                gridwidth   =0.5            # Gridline thickness
+                            ),
+
+            # Primary Y-axis (price)
+            yaxis=dict(
+                        title           =y_col,         # Y-axis label
+                        range           =[0, y_max],    # Y-axis range from 0 to rounded max
+                        tickmode        ='linear',      # Evenly spaced ticks
+                        tick0           =0,             # Start ticks from 0
+                        dtick           =50,            # Tick spacing: 50 units
+                        showticklabels  =True,          # Show tick labels
+                        tickformat      =',',           # Format numbers with commas
+                        showgrid        =True,          # Enable gridlines
+                        gridcolor       ='lightgrey',   # Gridline color
+                        gridwidth       =0.5            # Gridline thickness
+                    ),
+
+            # Secondary Y-axis (volume)
+            yaxis2=dict(
+                        title       =volume_col,    # Y-axis label
+                        overlaying  ='y',           # Overlay on primary Y-axis
+                        side        ='right',       # Position on right side
+                        showgrid    =True,          # Enable gridlines
+                        tickmode    ='linear',      # Evenly spaced ticks
+                        tick0       =0,             # Start ticks from 0
+                        dtick       =20000,         # Tick spacing: 20,000 units
+                        tickformat  =',',           # Format numbers with commas
+                        range       =[0, max_volume + 20000],  # Y-axis range with buffer
+                        gridcolor   ='lightgrey',   # Gridline color
+                        gridwidth   =0.5            # Gridline thickness
+                    ),
+
+            # Legend configuration
+            legend=dict(
+                        x           =0.5,           # Center horizontally
+                        y           =-0.2,          # Position below plot area
+                        xanchor     ='center',      # Anchor legend to center
+                        orientation ='h'            # Horizontal layout
+                    ),
+
+            # Layout margins
+            margin  =dict(
+                            l=40, r=40, t=40, b=120  # Extra bottom space for legend
+                        ),
+
+            height       =600,                       # Chart height in pixels
+            barmode      ='overlay',                 # Overlay bars on same x-axis
+            plot_bgcolor ='rgba(237, 237, 237, 1)',  # Plot area background
+            paper_bgcolor='rgba(237, 237, 237, 1)'   # Entire figure background
+        )
+
+        return go.Figure(data=traces, layout=layout)

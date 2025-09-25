@@ -1611,7 +1611,7 @@ class Option_Chain():
                     Log.error_msg("Yellow", "Insufficient funds for minimum lot size", True)
                     return "Insufficient funds"
 
-                Log.info_msg("Blue",
+                Log.info_msg("Green",
                              f"Attempt {attempt}: Placing limit buy order for {right.upper()} @ {asset_last_price}",
                              True)
 
@@ -3655,7 +3655,7 @@ class NIFTY_Stocks():
                 # Stock BHAAIR subscribed successfully
                 # Stock ITC subscribed successfully
 
-            Log.info_msg("Yellow", status.get('message'), True)
+            Log.debug_msg("Blue", status.get('message'), True)
 
             return status.get('message')
 
@@ -3756,7 +3756,7 @@ class NIFTY_Stocks():
                 else:
 
                     txt = f'{each_stock.stock_name} dataframe does not have any data'
-                    Log.info_msg("Yellow", txt, True)
+                    Log.info_msg("Green", txt, True)
 
             return "Success"
 

@@ -35,8 +35,8 @@ warnings.filterwarnings('ignore')
 '''
 lock = threading.Lock()
 
-code_start_time     = time(9, 1)
-mkt_start_time      = time(9, 15)
+code_start_time     = time(0, 1)
+mkt_start_time      = time(0, 15)
 code_end_time       = time(15, 30)
 ticks_queue         = 0
 option_chain_queue  = 0
@@ -98,11 +98,12 @@ def create_folders():
 ==================================================================================
 '''
 
-Log.debug_msg("White", junk, False)
+#Logging Hierarchy
 Log.info_msg("Green", junk, False)
-Log.warning_msg("Blue", junk, False)
-Log.error_msg("Yellow", junk, False)
-Log.critical_msg("Red", junk, False)
+Log.debug_msg("Blue", junk, False)
+Log.warning_msg("Yellow", junk, False)
+Log.error_msg("Red", junk, False)
+Log.critical_msg("Cyan", junk, False)
 
 
 def main():
@@ -117,6 +118,11 @@ def main():
 
     # Declaration of global variables
     global code_start_time, mkt_start_time, code_end_time, queue_length
+
+    #declaration of Front end app variable
+    global app
+    app = Display.built_dashboard()
+
 
     # Initialisation of variables
     code_start_time     = time(0, 1)
@@ -142,19 +148,21 @@ def main():
         txt = f'Waiting for market to open.current time {datetime.now().time()}'
         print(txt)
 
-    # Login to breeze api app
-    breeze = Connect_Breeze.login(breeze)
+    # Login to breeze api app after code start time
+    breeze          = Connect_Breeze.login(breeze)
     breeze.on_ticks = Ticks.importer(ticks_queue)
-    # det = Order_book.calc_P_and_L(datetime(2024, 1, 1, 9, 15),datetime(2025, 7, 13, 9, 15))
+
+    '''
     option_chain = breeze.get_option_chain_quotes(
                                                     stock_code      ="NIFTY",
                                                     exchange_code   ="NFO",
                                                     product_type    ="options",
                                                     expiry_date     ="2025-08-28T06:00:00.000Z",  # ISO8601 format
                                                     right           ="call",  # or "put"
-                                                    strike_price    =""  # leave blank to get fullchain
+                                                    strike_price    =""  # leave blank to get full chain
                                                 )
     holdings = breeze.get_portfolio_positions()
+    '''
 
     # initialize the important classes
     IP.init_parameters()
@@ -163,44 +171,30 @@ def main():
     NIFTY_Index.init_class_variables()
     NIFTY_Stocks.initiate_class()
 
+    #testing area
+    focus_call_df_list = Option_Chain.get_focus_list_df("call")
     a = IP.En_L1
-    threads,processes = Thread_Scheduler.start_threads_and_processes(start_events,
-                                                                     pause_events,
-                                                                     ticks_queue,
-                                                                     option_chain_queue,
-                                                                     nif_stocks_queue,
-                                                                     nif_index_queue,
-                                                                     queue_length)
 
-    # Wait for the market to open
+    #starting all necessary threads and processes
+    threads,processes = Thread_Scheduler.initiate_threads(['data_archiever','consumer','ticks_manager', 'entry_scanner','trade_entry', 'program_parameters','dashboard'])
+
+
     while datetime.now().time() < mkt_start_time:
         sleep(1)
         txt = f'Waiting for market to open.current time {datetime.now().time()}'
         Log.debug_msg("Blue", txt, True)
 
     # start execution of thread and process to load ticks
-    start_events['ticks_manager'].set()
+    Thread_Scheduler.start_thread(['ticks_manager','consumer','entry_scanner','trade_entry', 'square_off', 'data_archiever', 'program_parameters'])
     start_events['consumer'].set()
-    start_events['data_archiever'].set()
-    start_events['entry_scanner'].set()
-    start_events['trade_entry'].set()
-    start_events['program_parameters'].set()
-
-    # clear pause execution flag
-    pause_events['ticks_manager'].set()
     pause_events['consumer'].set()
-    pause_events['data_archiever'].clear()
-    pause_events['entry_scanner'].set()
-    pause_events['trade_entry'].set()
-    pause_events['program_parameters'].set()
-
     # starting dash app
     txt = "Starting Dash App..."
     Log.info_msg("Green", txt, True)
-    app = Display.built_dashboard()
 
-    t1 = threading.Thread(target=Display.run_app, args=(app,))
-    t1.start()
+
+
+
 
     # Thread List
     '''
@@ -212,7 +206,7 @@ def main():
     TH6 :Codes to be executed every second like VWAP,square off detection  
     '''
 
-    Thread_Scheduler.start_threads(['TH2'])
+
 
     while datetime.now().time() < code_end_time and IP.ctrl_ptrs['Main_Program'].iloc[-1] == 0:
 
@@ -240,6 +234,7 @@ def main():
 
             txt = f'Transaction Details::{Order_book.Trx_list}'
             Log.info_msg("Green",txt,True)
+
 
 
         except KeyboardInterrupt:
@@ -323,7 +318,7 @@ class IP():
 
         except Exception as e:
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return "Success"
 
@@ -346,7 +341,7 @@ class IP():
 
         except Exception as e:
             txt = f'update_program_parameters ran into some issues \nError Details ::{e} \n Traceback ::{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return "Success"
 
@@ -404,25 +399,6 @@ class IP():
 
         return df
 
-    @staticmethod
-    def update_parameters_thread(start_thread,pause_thread):
-
-        try:
-
-            t = threading.Thread(IP.update_parameters, args=(start_thread,pause_thread))
-            Global_function.update_thread_list(t,"update_parameter_thread")
-
-            return "Success"
-
-        except Exception as e:
-
-            txt = f'Error while starting update_parameters./nError Details::{e}'
-            Log.error_msg("Red",txt,True)
-
-        finally:
-
-            txt = f'update parameters thread initiated'
-            Log.error_msg("Red",txt,True)
 
     @staticmethod
     def update_parameters(start_thread,pause_thread):
@@ -430,6 +406,7 @@ class IP():
         try:
 
             global code_end_time
+
             txt = f'{Thread_Scheduler.Thread_List.loc["TH2", "Name"]} Thread initiated'
             Log.info_msg("Green", txt, True)
 
@@ -451,7 +428,7 @@ class IP():
 
 
             txt = f'Execution error while updating Input Parameters::/nError Details::{e} /nError Source::{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
             return "Success"
 
         finally:
@@ -527,12 +504,21 @@ class Option_Chain():
 
         try:
             addresses = Option_Chain.SP_df.loc[Option_Chain.SP_df["focus_SP"] == 1, "Address"].tolist()
+
+            a = addresses[0].call_df_sec
+            b = addresses[1].call_df_sec
             return_df = []
-            return_df = (
-                            [address.call_df_sec for address in addresses]
-                            if right == "call"
-                            else [address.put_df_sec for address in addresses]
-                        )
+
+            for address in addresses:
+                if right == "call":
+                    return_df.append(address.call_df_sec)
+                else:
+                    return_df.append(address.put_df_sec)
+
+            return_df = return_df[:5]
+
+            return return_df
+
         except:
 
             return []
@@ -562,16 +548,16 @@ class Option_Chain():
             status = Option_Chain.update_focus_SP_and_object_list()
 
             if status != "Success":
-                Log.error_msg("Yellow", status, True)
+                Log.error_msg("Red", status, True)
 
 
         except Exception as e:
 
             txt = f'Error while executing init_class_variables of Option Chain \nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return "Success"
 
@@ -591,10 +577,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Exception while downloading instruments \nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -645,10 +631,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Exception while downloading historical data \nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return df
 
@@ -699,7 +685,7 @@ class Option_Chain():
                     if exp_date >= cut_off_date:
                         expiry_date = exp_date
                         break
-                    
+
 
             else:
                 expiry_date     =  expiry_list[0]
@@ -710,10 +696,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Exception while downloading expiry date from option chain Tree \nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
         return expiry_date
 
@@ -774,10 +760,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Exception while subscribing Option Chain SP{self.strike_price} \nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             sleep(0.1)
 
@@ -817,10 +803,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Exception while unsubscribing Option Chain{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             sleep(0.1)
             return counter
@@ -877,10 +863,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Failed to get strike price list.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return []
 
@@ -936,10 +922,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Exception while adding SP:{strike_price} in option chain tree.Error Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
     @staticmethod
     def remove_strike_price_and_object(strike_price, expiry_date, stock_code):
@@ -959,10 +945,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Exception while removing SP:{strike_price} from option chain SP_df.Error Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -1011,10 +997,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Exception while updating stirke price list in function find_add_and_remove_SP_list.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return [add_SP_list, del_SP_list]
 
@@ -1077,10 +1063,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f"Unknown type of error happened while updating focus SP list function.\nError Details::{e}"
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return e
 
@@ -1111,7 +1097,7 @@ class Option_Chain():
             status = Option_Chain.update_focus_SP_and_object_list()
 
             if status != "Success":
-                Log.error_msg("Yellow", status, True)
+                Log.error_msg("Red", status, True)
 
             min_SP = Option_Chain.SP_df['strike_price'].min()
             max_SP = Option_Chain.SP_df['strike_price'].max()
@@ -1136,7 +1122,7 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Exception while executing utility_and_update function \n Error details::{e} \nTrace Back::{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
         return "Success"
 
@@ -1168,10 +1154,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Exception while executing start thread in Option Chain class.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
         return "Success"
 
@@ -1215,7 +1201,7 @@ class Option_Chain():
             else:
 
                 # txt = f"Invalid tick recieved in {self.strike_price} with interval ::{tick['interval']}"
-                # Log.error_msg("Yellow",txt,True)
+                # Log.error_msg("Red",txt,True)
 
                 return
 
@@ -1286,10 +1272,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Exception while adding ticks in option chain tree at section'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -1321,7 +1307,7 @@ class Option_Chain():
 
             txt = f'Error while filling dataframe with dummy data.\nError Details :: {e}'
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
     # Instance Method
     def trim_ticks_df_head(self, cut_off_time, cut_off_length):
@@ -1353,14 +1339,14 @@ class Option_Chain():
                 if filtered_df.empty:
 
                     txt = f"{self.strike_price}|| CALL cannot be trimmed as it does not have any data older than {cut_off_time}"
-                    Log.error_msg("Yellow", txt, True)
+                    Log.error_msg("Red", txt, True)
 
                     temp = self.re_subscribe_ticks('1second')
                     txt = f'status of resubscription {temp}'
-                    Log.error_msg("Yellow", txt, True)
+                    Log.error_msg("Red", txt, True)
 
                     txt = f"{self.strike_price}|| CALL || start_time = {call_df['datetime'].iloc[0]} end_time = {call_df['datetime'].iloc[-1]} "
-                    Log.error_msg("Yellow", txt, True)
+                    Log.error_msg("Red", txt, True)
 
                     if len(filtered_df) > cut_off_length:
                         filtered_df = filtered_df.iloc[:min(len(filtered_df), cut_off_length)]
@@ -1385,12 +1371,12 @@ class Option_Chain():
             elif not call_shape:
 
                 txt = f"{self.strike_price} || CALL dataframe is empty"
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
             elif not datetime_format:
 
                 txt = "{cut_off_time} data format is not valid. Datatype = {type(cut_off_time)}"
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
             if put_shape == True and datetime_format == True:
 
@@ -1399,10 +1385,10 @@ class Option_Chain():
                 if filtered_df.empty:
 
                     txt = f"{self.strike_price} || PUT does not have any data older than {cut_off_time}"
-                    Log.error_msg("Yellow", txt, True)
+                    Log.error_msg("Red", txt, True)
 
                     temp = self.re_subscribe_ticks('1second')
-                    Log.error_msg("Yellow", txt, True)
+                    Log.error_msg("Red", txt, True)
 
                     if len(filtered_df) > cut_off_length:
                         with self.put_lock:
@@ -1410,7 +1396,7 @@ class Option_Chain():
 
                         txt = f"{self.strike_price}|| CALL trimmed any data more than cut_off_length {cut_off_length}"
                         counter += 1
-                        Log.debug_msg("Yellow", txt, True)
+                        Log.debug_msg("Blue", txt, True)
 
 
                 else:
@@ -1424,15 +1410,15 @@ class Option_Chain():
             elif not put_shape:
 
                 txt = f"{self.strike_price} || PUT dataframe is empty"
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
                 temp = self.re_subscribe_ticks('1second')
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
             elif not datetime_format:
 
                 txt = f"{cut_off_time} data format is not valid. Datatype = {type(cut_off_time)}"
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
             return counter
 
@@ -1440,10 +1426,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Exception while trimming Option Chain  SP{self.strike_price}.\nError Details: {e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -1479,10 +1465,10 @@ class Option_Chain():
                 if filtered_df.empty:
 
                     txt = f"{self.strike_price}|| CALL cant be archived as it does not have any data older than {cut_off_time}"
-                    Log.error_msg("Yellow", txt, True)
+                    Log.error_msg("Red", txt, True)
 
                     txt = f"{self.strike_price}|| CALL || start_time = {call_df['datetime'].iloc[0]} end_time = {call_df['datetime'].iloc[-1]} "
-                    Log.error_msg("Yellow", txt, True)
+                    Log.error_msg("Red", txt, True)
 
                     if len(filtered_df) > cut_off_length:
                         filtered_df = filtered_df.iloc[:min(len(filtered_df), cut_off_length)]
@@ -1508,12 +1494,12 @@ class Option_Chain():
             elif not call_shape:
 
                 txt = "{self.strike_price} || CALL dataframe is empty"
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
             elif not datetime_format:
 
                 txt = "{cut_off_time} data format is not valid. Datatype = {type(cut_off_time)}"
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
             if put_shape == True and datetime_format == True:
 
@@ -1523,7 +1509,7 @@ class Option_Chain():
                 if filtered_df.empty:
 
                     txt = f"{self.strike_price} || PUT does not have any data older than {cut_off_time}"
-                    Log.error_msg("Yellow", txt, True)
+                    Log.error_msg("Red", txt, True)
 
                 else:
 
@@ -1534,22 +1520,22 @@ class Option_Chain():
             elif not put_shape:
 
                 txt = f"{self.strike_price} || PUT dataframe is empty"
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
             elif not datetime_format:
 
                 txt = "{cut_off_time} data format is not valid. Datatype = {type(cut_off_time)}"
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
             return counter
 
         except Exception as e:
 
             txt = f'Exception while saving Option Chain {self.strike_price} : {e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -1568,12 +1554,12 @@ class Option_Chain():
         except Exception as error_descriptor:
 
             txt = f"Auto‑archival crashed: {error_descriptor}\n{traceback.format_exc()}"
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
         finally:
 
             txt = f"Auto‑archival completed for Option chain for time {cut_off_time}"
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
         return
 
@@ -1596,7 +1582,7 @@ class Option_Chain():
 
             df = self.call_df_sec if right.lower() == 'call' else self.put_df_sec
             if df.empty:
-                Log.error_msg("Yellow", "Price DataFrame is empty", True)
+                Log.error_msg("Red", "Price DataFrame is empty", True)
                 return "Failed"
 
             min_lot_size = 75
@@ -1608,10 +1594,10 @@ class Option_Chain():
                 buy_qty = Order_book.determine_buy_qty(fno_avl_bal, asset_last_price, min_lot_size)
 
                 if buy_qty < min_lot_size:
-                    Log.error_msg("Yellow", "Insufficient funds for minimum lot size", True)
+                    Log.error_msg("Red", "Insufficient funds for minimum lot size", True)
                     return "Insufficient funds"
 
-                Log.info_msg("Blue",
+                Log.info_msg("Green",
                              f"Attempt {attempt}: Placing limit buy order for {right.upper()} @ {asset_last_price}",
                              True)
 
@@ -1633,12 +1619,12 @@ class Option_Chain():
                         strike_price=self.strike_price
                     )
                 except Exception as oe:
-                    Log.error_msg("Yellow", f"API call failed: {str(oe)}", True)
+                    Log.error_msg("Red", f"API call failed: {str(oe)}", True)
                     continue
 
                 if "Error" in order_details:
                     error_details = order_details["Error"]
-                    Log.error_msg("Yellow", f"Order error: {error_details}", True)
+                    Log.error_msg("Red", f"Order error: {error_details}", True)
                     continue
 
                 order_id = order_details["Success"].get("order_id")
@@ -1649,16 +1635,16 @@ class Option_Chain():
                     Exit_Scanners.square_off_holdings(order_id)
                     return "Success"
 
-                Log.error_msg("Yellow", f"Order not successful. Status: {order_status}", True)
+                Log.error_msg("Red", f"Order not successful. Status: {order_status}", True)
 
-            Log.error_msg("Yellow", f"Limit order failed after 5 attempts for {right.upper()} @ {self.strike_price}",
+            Log.error_msg("Red", f"Limit order failed after 5 attempts for {right.upper()} @ {self.strike_price}",
                           True)
             return "Failed"
 
         except Exception as e:
-            Log.error_msg("Yellow", f"Exception during limit buy for {self.strike_price} | {right}", True)
-            Log.error_msg("Yellow", f"Error: {str(e)}", True)
-            Log.error_msg("Yellow", traceback.format_exc(), True)
+            Log.error_msg("Red", f"Exception during limit buy for {self.strike_price} | {right}", True)
+            Log.error_msg("Red", f"Error: {str(e)}", True)
+            Log.error_msg("Red", traceback.format_exc(), True)
             return "Failed"
 
 
@@ -1680,7 +1666,7 @@ class Option_Chain():
             # 1. Initialize Variables
             df = self.call_df_sec if right.lower() == 'call' else self.put_df_sec
             if df.empty:
-                Log.error_msg("Yellow", "Price DataFrame is empty", True)
+                Log.error_msg("Red", "Price DataFrame is empty", True)
                 return "Failed"
 
             asset_last_price    = df['close'].iloc[-1]
@@ -1695,7 +1681,7 @@ class Option_Chain():
             for attempt in range(5):
 
                 if buy_qty < min_lot_size:
-                    Log.error_msg("Yellow", "Insufficient funds for minimum lot size", True)
+                    Log.error_msg("Red", "Insufficient funds for minimum lot size", True)
                     return "Insufficient funds"
 
                 try:
@@ -1716,7 +1702,7 @@ class Option_Chain():
                                             strike_price        =   self.strike_price
                                         )
                 except Exception as oe:
-                    Log.error_msg("Yellow", f"Breeze API Exception: {oe}", True)
+                    Log.error_msg("Red", f"Breeze API Exception: {oe}", True)
                     continue
 
                 if "Error" not in order_details:
@@ -1731,23 +1717,23 @@ class Option_Chain():
 
                     else:
 
-                        Log.error_msg("Yellow", f"Order status not successful: {order_status}", True)
+                        Log.error_msg("Red", f"Order status not successful: {order_status}", True)
                         continue
                 else:
                     error_details = order_details.get("Error")
-                    Log.error_msg("Yellow",
+                    Log.error_msg("Red",
                                   f"Error placing order for {self.strike_price} | {right.upper()} at {asset_last_price}",
                                   True)
-                    Log.error_msg("Yellow", f"Error Details::{error_details}", True)
+                    Log.error_msg("Red", f"Error Details::{error_details}", True)
 
-            Log.error_msg("Yellow", f"Market order failed after retries for {right.upper()} @ {self.strike_price}",
+            Log.error_msg("Red", f"Market order failed after retries for {right.upper()} @ {self.strike_price}",
                           True)
             return "Failed"
 
         except Exception as e:
-            Log.error_msg("Yellow", f"Exception while placing market buy order for {self.strike_price} | {right}", True)
-            Log.error_msg("Yellow", f"Error Details::{e}", True)
-            Log.error_msg("Yellow", traceback.format_exc(), True)
+            Log.error_msg("Red", f"Exception while placing market buy order for {self.strike_price} | {right}", True)
+            Log.error_msg("Red", f"Error Details::{e}", True)
+            Log.error_msg("Red", traceback.format_exc(), True)
             return "Failed"
 
     # Instance Method
@@ -1774,7 +1760,7 @@ class Option_Chain():
             df = self.call_df_sec if right.lower() == 'call' else self.put_df_sec
 
             if df.empty:
-                Log.error_msg("Yellow", "Price DataFrame is empty", True)
+                Log.error_msg("Red", "Price DataFrame is empty", True)
                 return "Error"
 
             counter             = 5
@@ -1827,20 +1813,20 @@ class Option_Chain():
 
                 except Exception as oe:
 
-                    Log.error_msg("Yellow", f"Breeze API Exception: {oe}", True)
-                    
+                    Log.error_msg("Red", f"Breeze API Exception: {oe}", True)
+
                     txt = f'{traceback.format_exc()}'
-                    Log.error_msg("Yellow", txt, True)
+                    Log.error_msg("Red", txt, True)
 
                     continue
 
         except Exception as e:
 
             txt = f'Exception while placing sell limit order \nError Desc::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return "Failed"
 
@@ -1855,7 +1841,7 @@ class Option_Chain():
             df = self.call_df_sec if right.lower() == 'call' else self.put_df_sec
 
             if df.empty:
-                Log.error_msg("Yellow", "Price DataFrame is empty", True)
+                Log.error_msg("Red", "Price DataFrame is empty", True)
                 return "Error"
 
             counter             = 5
@@ -1909,7 +1895,7 @@ class Option_Chain():
 
                 except Exception as oe:
 
-                    Log.error_msg("Yellow", f"Breeze API Exception: {oe}", True)
+                    Log.error_msg("Red", f"Breeze API Exception: {oe}", True)
                     continue
 
                     # testing purpose manual approach
@@ -1918,10 +1904,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Exception while placing sell limit order \nError Desc::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return "Failed"
 
@@ -1959,10 +1945,10 @@ class Option_Chain():
         except Exception as error_descriptor:
 
             txt = f'Error while executing evaluate_SP_call_buy for {self.strike_price}||call.\nError Details::{error_descriptor}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
         finally:
 
@@ -2004,10 +1990,10 @@ class Option_Chain():
         except Exception as error_descriptor:
 
             txt = f'Error while executing evaluate_SP_put_buy for {self.strike_price}|| put.\nError Details::{error_descriptor}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
 
         finally:
@@ -2048,10 +2034,10 @@ class Option_Chain():
         except Exception as error_descriptor:
 
             txt = f'Error while executing evaluate_SP_call_sell for {self.strike_price}|| put'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
 
         finally:
@@ -2092,10 +2078,10 @@ class Option_Chain():
         except Exception as error_descriptor:
 
             txt = f'Error while executing evaluate_SP_put_sell for {self.strike_price}|| put'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
 
         finally:
@@ -2128,8 +2114,8 @@ class Option_Chain():
                     SP_df.at[index, 'call_buy_flag_time'] = datetime.now()
 
         except Exception as e:
-            Log.error_msg("Yellow", f'Error in evaluate_call_buy: {e}', True)
-            Log.error_msg("Yellow", traceback.format_exc(), True)
+            Log.error_msg("Red", f'Error in evaluate_call_buy: {e}', True)
+            Log.error_msg("Red", traceback.format_exc(), True)
 
         finally:
 
@@ -2145,7 +2131,7 @@ class Option_Chain():
 
             if state != 'Success':
 
-                Log.error_msg("Yellow", f'Error in evaluate_call_buy: {state}', True)
+                Log.error_msg("Red", f'Error in evaluate_call_buy: {state}', True)
 
     @staticmethod
     def evaluate_call_sell(SP_df, evaluation_parameters, start_flag, pause_flag):
@@ -2169,8 +2155,8 @@ class Option_Chain():
                         SP_df.at[index, 'call_sell_flag_time'] = datetime.now()
 
         except Exception as e:
-                Log.error_msg("Yellow", f'Error in evaluate_call_sell: {e}', True)
-                Log.error_msg("Yellow", traceback.format_exc(), True)
+                Log.error_msg("Red", f'Error in evaluate_call_sell: {e}', True)
+                Log.error_msg("Red", traceback.format_exc(), True)
 
         finally:
 
@@ -2185,7 +2171,7 @@ class Option_Chain():
                                                     )
 
                 if state != 'Success':
-                    Log.error_msg("Yellow", f'Error in evaluate_call_sell: {state}', True)
+                    Log.error_msg("Red", f'Error in evaluate_call_sell: {state}', True)
 
     @staticmethod
     def evaluate_put_sell(SP_df, evaluation_parameters, start_flag, pause_flag):
@@ -2210,8 +2196,8 @@ class Option_Chain():
                     SP_df.at[index, 'put_sell_flag_time']  = datetime.now()
 
         except Exception as e:
-            Log.error_msg("Yellow", f'Error in evaluate_put_sell: {e}', True)
-            Log.error_msg("Yellow", traceback.format_exc(), True)
+            Log.error_msg("Red", f'Error in evaluate_put_sell: {e}', True)
+            Log.error_msg("Red", traceback.format_exc(), True)
 
         finally:
 
@@ -2226,7 +2212,7 @@ class Option_Chain():
                                                     )
 
                 if state != 'Success':
-                    Log.error_msg("Yellow", f'Error in evaluate_put_sell: {state}', True)
+                    Log.error_msg("Red", f'Error in evaluate_put_sell: {state}', True)
 
 
     @staticmethod
@@ -2251,8 +2237,8 @@ class Option_Chain():
 
         except Exception as e:
 
-            Log.error_msg("Yellow", f'Error in evaluate_put_buy: {e}', True)
-            Log.error_msg("Yellow", traceback.format_exc(), True)
+            Log.error_msg("Red", f'Error in evaluate_put_buy: {e}', True)
+            Log.error_msg("Red", traceback.format_exc(), True)
 
         finally:
 
@@ -2267,7 +2253,7 @@ class Option_Chain():
                                                     )
 
                 if state != 'Success':
-                    Log.error_msg("Yellow", f'Error in evaluate_put_buy: {state}', True)
+                    Log.error_msg("Red", f'Error in evaluate_put_buy: {state}', True)
 
 
     @staticmethod
@@ -2303,10 +2289,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Error while executing evaluate_OP function.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
         finally:
 
@@ -2366,7 +2352,7 @@ class Option_Chain():
             Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
     @staticmethod
     def evaluate_OP_sell(evaluation_parameters, start_flag, pause_flag):
@@ -2428,7 +2414,7 @@ class Option_Chain():
             Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
     @staticmethod
     def graceful_exit():
@@ -2474,10 +2460,10 @@ class Option_Chain():
         except Exception as e:
 
             txt = f'Exception while executing Option Chain graceful exit:{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
     @staticmethod
     def summarize_strike_prices():
@@ -2537,7 +2523,7 @@ class Option_Chain():
 
             # traceback
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return "Error"
 
@@ -2638,10 +2624,10 @@ class NIFTY_Index():
         except Exception as e:
 
             txt = f'Exception while initialising NIFTY Index class Variables.\nError Details::{str(e)}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -2668,10 +2654,10 @@ class NIFTY_Index():
         except Exception as e:
 
             txt = f'Exception while subscribing NIFTY Index live stream at section'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             print(status)
 
@@ -2715,10 +2701,10 @@ class NIFTY_Index():
         except Exception as e:
 
             txt = f'Exception while downloading historical data of NIFTY Index.\nError Details::{e} '
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -2789,10 +2775,10 @@ class NIFTY_Index():
         except Exception as e:
 
             txt = f'Exception while downloading historical data'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -2862,7 +2848,7 @@ class NIFTY_Index():
         except Exception as e:
 
             txt = f'Error while Trimming NIFTY Index data.\n Error Details::{e}\nTrace back::{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -2896,9 +2882,9 @@ class NIFTY_Index():
 
 
                     txt = f"{NIFTY_Index.stock_name}|| NIFTY does not have any data older than {cut_off_time}"
-                    Log.error_msg("Yellow", txt, True)
+                    Log.error_msg("Red", txt, True)
                     txt = f"{NIFTY_Index.stock_name}|| start_time = {NIFTY_df['datetime'].iloc[0]} end_time = {NIFTY_df['datetime'].iloc[-1]} "
-                    Log.error_msg("Yellow", txt, True)
+                    Log.error_msg("Red", txt, True)
 
                 else:
 
@@ -2912,7 +2898,7 @@ class NIFTY_Index():
             elif not NIFTY_shape:
 
                 txt = "{self.strike_price} || NIFTY dataframe is empty"
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
             elif not datetime_format:
 
@@ -2922,10 +2908,10 @@ class NIFTY_Index():
         except Exception as e:
 
             txt = f'Exception while saving NIFTY Index ticks data.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return counter
 
@@ -2985,10 +2971,10 @@ class NIFTY_Index():
         except Exception as e:
 
             txt = f'Exception while storing tick in NIFTY Index.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -3011,10 +2997,10 @@ class NIFTY_Index():
         except Exception as e:
 
             txt = f'Error While Loading NIFTY Index dataframe with dummy data.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
     @classmethod
     def graceful_exit(cls, ):
@@ -3070,10 +3056,10 @@ class NIFTY_Index():
         except Exception as e:
 
             txt = f'Exception while executing Otion Chain graceful exit:{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
     @classmethod
     def un_subscribe_ticks(cls, interval):
@@ -3106,10 +3092,10 @@ class NIFTY_Index():
         except Exception as e:
 
             txt = f'Exception while Un-subscribing NIFTY Index || {e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return 0
 
@@ -3180,10 +3166,10 @@ class NIFTY_Stocks():
         except Exception as e:
 
             txt = f'Error while doing Auto archival of NIFTY Stocks.Error Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return "Success"
 
@@ -3210,10 +3196,10 @@ class NIFTY_Stocks():
         except Exception as e:
 
             txt = f'Error while filling dataframe with dummy data of NIFTY Stocks.Error Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
     @classmethod
     def calc_VWAP_height(cls, n_stocks):
@@ -3233,10 +3219,10 @@ class NIFTY_Stocks():
         except Exception as e:
 
             txt = f'Error while calculating VWAP Height.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return 0
 
@@ -3265,10 +3251,10 @@ class NIFTY_Stocks():
         except  Exception as e:
 
             txt = f'Error while counting Uptrend Stock Count.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
     @classmethod
     def VWAP_downtrend_counter(cls, n_stocks, threshold_pct):
@@ -3294,10 +3280,10 @@ class NIFTY_Stocks():
         except  Exception as e:
 
             txt = f'Error while counting down-trending Stocks Count.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
     # Instance Method
     def add_tick(self, tick):
@@ -3337,10 +3323,10 @@ class NIFTY_Stocks():
         except Exception as e:
 
             txt = f'Error while adding ticks in NIFTY Stocks.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -3388,19 +3374,19 @@ class NIFTY_Stocks():
             elif not stock_df_shape:
 
                 txt = f"{self.stock_name} dataframe is empty"
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
             elif not datetime_format:
 
                 txt = f"{cut_off_time} data format is not valid. Datatype = {type(cut_off_time)}"
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
             return
 
         except Exception as e:
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -3446,22 +3432,22 @@ class NIFTY_Stocks():
             elif not stock_df_shape:
 
                 txt = f"{self.stock_name} dataframe is empty"
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
             elif not datetime_format:
 
                 txt = f"{cut_off_time} data format is not valid. Datatype = {type(cut_off_time)}"
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
             return counter
 
         except Exception as e:
 
             txt = f'Error while counting saving NIFTY Stocks data::{self.stock_name}.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -3499,10 +3485,10 @@ class NIFTY_Stocks():
         except Exception as e:
 
             txt = f'Error while downloading historic NIFTY Stocks data::{self.stock_name}.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -3575,10 +3561,10 @@ class NIFTY_Stocks():
         except Exception as e:
 
             txt = f'error while downloading NIFTY stocks historical data {e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return
 
@@ -3607,17 +3593,17 @@ class NIFTY_Stocks():
                 except Exception as e:
 
                     txt = f"Issue with object creation and subscription of NIFTY STOCK {stock_name}.\nError Details::{e}"
-                    Log.error_msg("Yellow", txt, True)
+                    Log.error_msg("Red", txt, True)
 
                     txt = f'{traceback.format_exc()}'
-                    Log.error_msg("Yellow", txt, True)
+                    Log.error_msg("Red", txt, True)
 
             return
 
         except Exception as e:
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
     @classmethod
     def unsubscribe_all_stocks(cls):
 
@@ -3632,10 +3618,10 @@ class NIFTY_Stocks():
         except Exception as e:
 
             txt = f'Exception while unsubscribing stock data of {stock_objects.stock_name}.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
     # Instance Method
     def subscribe_ticks(self,):
@@ -3655,16 +3641,16 @@ class NIFTY_Stocks():
                 # Stock BHAAIR subscribed successfully
                 # Stock ITC subscribed successfully
 
-            Log.info_msg("Yellow", status.get('message'), True)
+            Log.debug_msg("Yellow", status.get('message'), True)
 
             return status.get('message')
 
         except Exception as e:
             txt = f'Exception while subscribing stock data of {self.stock_name}.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
     # Instance Method
     def un_subscribe_ticks(self, ):
@@ -3686,10 +3672,10 @@ class NIFTY_Stocks():
         except Exception as e:
 
             txt = f'Exception while unsubscribing stock data of {self.stock_name}.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
 
     @classmethod
@@ -3722,10 +3708,10 @@ class NIFTY_Stocks():
         except Exception as e:
 
             txt = f'Exception while executing NIFTY_Stocks graceful exit:{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
         return
 
@@ -3756,7 +3742,7 @@ class NIFTY_Stocks():
                 else:
 
                     txt = f'{each_stock.stock_name} dataframe does not have any data'
-                    Log.info_msg("Yellow", txt, True)
+                    Log.debug_msg("Blue", txt, True)
 
             return "Success"
 
@@ -3764,10 +3750,10 @@ class NIFTY_Stocks():
         except Exception as e:
 
             txt = f'Exception while preparing summary stock data.\nError Details::{e}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return "Failed"
 
@@ -3846,14 +3832,14 @@ class Order_book():
                 else:
 
                     txt = ' Order ID::{order_id} failed to execute at limit price'
-                    Log.info_msg("Red", txt, True)
+                    Log.info_msg("Green", txt, True)
 
                     return "Failed"
 
             else:
 
                 txt = 'No Order details found for Order ID::{order_id}'
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
                 return "Failed"
 
@@ -3861,7 +3847,7 @@ class Order_book():
         except Exception as e:
 
             txt = f'Error while getting order details order ID::{order_id} \n{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
             return "Failed"
 
         finally:
@@ -3909,7 +3895,7 @@ class Order_book():
         except Exception as e:
 
             txt = f'Error while calculating P_and_L \n{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
 
         finally:
@@ -4163,16 +4149,31 @@ class Order_book():
 
 class Display():
 
-    NIFTY_Index_data    = pd.DataFrame(columns=['NIFTY 50 close'])
-    NIFTY_Stocks_data   = pd.DataFrame(columns=['n=','uptrend_count','downtrend_count','VWAP_height'])
-    Current_time        = datetime.now()
-    Trade_and_profit    = []
-    Thread_status       = pd.DataFrame(columns=['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8'])
-    Trade_list          = pd.DataFrame(columns=['Strike_price', 'Call/Put', 'Trx_Type', 'Qty',
-                                                'Entry_Time', 'Sq_off_time', 'Entry_price',
-                                                'Sq_off_price', 'P/L Amount'])
+    NIFTY_Index_table   = pd.DataFrame([{"NIFTY 50 close": f"0(+0)"}])
+
+    NIFTY_vwap_table    = pd.DataFrame([{'n=': '10', 'uptrend_count': '0', 'downtrend_count': '0', 'VWAP_height': '0'},
+                                        {'n=': '50', 'uptrend_count': '0', 'downtrend_count': '0', 'VWAP_height': '0'}])
+
+    ticks_stats         = pd.DataFrame({
+                                            "Particulars": ["Current Time"                        , "T_Count", "Queue Length"],
+                                            "Value": [datetime.now().strftime("%d-%b-%Y %H:%M:%S"),"1,222"   ,      "0"      ]
+                                        })
+
+    P_and_L             = pd.DataFrame({
+                                            "Profits": ["Weekly Profit", "Day Profit", "Current Holding Profit"],
+                                            "Value": [0, 0, 0]
+                                        })
+    greeks_table          =  pd.DataFrame({
+                                            "strike_price": [19500, 19600, 19700, 19800, 19900],
+                                            "delta": [0.62, 0.55, 0.48, 0.40, 0.32],
+                                            "gamma": [0.012, 0.015, 0.018, 0.016, 0.013],
+                                            "theta": [-6.5, -6.2, -6.0, -5.8, -5.6],
+                                            "vega": [45, 50, 53, 49, 44],
+                                            "rho": [22, 21, 20, 19, 18],
+                                            "IV (%)": [12.5, 13.0, 13.3, 12.8, 12.2]
+                                        })
+
     Trigger_list        = pd.DataFrame(columns=['datetime', 'Active_Logic', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8'])
-    button_count        = pd.DataFrame(columns=['Entry_Block_btn', 'Exit_Block_btn', 'Liquidate_All_btn', 'Code_deactivate_btn'])
 
     def __init__(self):
         return
@@ -4243,61 +4244,91 @@ class Display():
             global queue_length
 
             # calculating revised NIFTY_Index_table_value
-            previous_close  = NIFTY_Index.daily_df['close'].iloc[-1]
-            current_value   = NIFTY_Index.current_val if NIFTY_Index.current_val > 0 else \
-                              NIFTY_Index.daily_df['close'].iloc[-1]
-            up_down         = round(current_value - previous_close, 2)
+            #NIFTY_Index_table = Dashboard.prepare_table_nif_value(NIFTY_Index.daily_df,NIFTY_Index.current_val)
+            #txt = f'NIFTY_Index_table Type::{type(NIFTY_Index_table)} \n Data::{NIFTY_Index_table}'
+            #Log.info_msg("Green",txt,True)
+            #NIFTY_Index_table = dash.no_update
 
-            Display.NIFTY_Index_data.loc[0, 'NIFTY 50 close'] = f'{current_value}({up_down})'
-            NIFTY_Index_info = Dashboard.publish_table(Display.NIFTY_Index_data)
+            #tick_Statistics
+            tick_stats_table  = Dashboard.prepare_table_tick_stats(queue_length,Ticks.tick_count)
+            txt = f'tick_stats_table Type::{type(tick_stats_table)} \n Data::{tick_stats_table}'
+            Log.info_msg("Green", txt, True)
 
-
-            # Capture the current x-axis range from the range slider of candlesticks chart 1 and chart 2
-            range1 = Dashboard.get_chart_axis_range(relayout_data1)
-            range2 = Dashboard.get_chart_axis_range(relayout_data2)
-
+            #tick_stats_table = dash.no_update
             #update_NIFTY_VWAP table data
-            NIFTY_Stocks_info = Dashboard.publish_table(Display.NIFTY_Stocks_data)
+            Display.update_VWAP()
+            NIFTY_vwap_table = Dashboard.publish_table(Display.NIFTY_Stocks_data)
+            txt = f'NIFTY_vwap_table Type::{type(NIFTY_vwap_table)} \n Data::{NIFTY_vwap_table}'
+            Log.info_msg("Green", txt, True)
 
+            #NIFTY_vwap_table = dash.no_update
             #update P_and_L table data
-            new_label1 = (f"Time :: {datetime.now().strftime('%dth %b, %Y %H:%M:%S')}  "
-                          f"T-Count ::{Ticks.tick_count} Ticks Pipeline:{queue_length}")  # Example: Update label text
-            new_label2 = f"Profit/Loss :: 10,00,000"  # Example: Update label text
+
+            P_and_L_table = Dashboard.prepare_table_P_and_L(Order_book.Active_order_list, Order_book.Trx_list)
+            #P_and_L_table =  dash.no_update
+            txt = f'P_and_L_table Type::{type(P_and_L_table)} \n Data::{P_and_L_table}'
+            Log.info_msg("Green", txt, True)
+
 
             #update candlestick chart 1 data
-            bands = Global_function.identify_plot_band(NIFTY_Index.support_band, NIFTY_Index.resistance_band,
+            bands   = Global_function.identify_plot_band(NIFTY_Index.support_band, NIFTY_Index.resistance_band,
                                                        NIFTY_Index.df_sec, NIFTY_Index.df_min, NIFTY_Index.daily_df)
-            candlestick_fig1 = Dashboard.plot_candlestick_chart(NIFTY_Index.daily_df, range1, bands, None,
-                                                                Display.today_NIF_range, None, False)
-            #update candlestick chart 2 data
+            range1  = Dashboard.get_chart_axis_range(relayout_data1)
 
+            candlestick_fig1 = Dashboard.plot_candlestick_chart(NIFTY_Index.daily_df, range1, bands, None,
+                                                                None, None, False)
+            #update candlestick chart 2 data
+            range2 = Dashboard.get_chart_axis_range(relayout_data2)
             candlestick_fig2 = Dashboard.plot_nifty_50_live_chart(NIFTY_Index.df_sec, NIFTY_Index.df_min, None, range2,
                                                                   bands)
 
             #update call_display chart
             focus_call_df_list = Option_Chain.get_focus_list_df("call")
-            Dashboard.create_price_volume_chart("call_display", focus_call_df_list, "datetime", "close", "volume")
-
+            call_fig        = Dashboard.plot_price_volume_chart(focus_call_df_list, "datetime", "close", "volume")
 
             #update put_display chart
             focus_put_df_list = Option_Chain.get_focus_list_df("put")
-            Dashboard.create_price_volume_chart("put_display", focus_call_df_list, "datetime", "close", "volume")
+            put_fig        = Dashboard.plot_price_volume_chart(focus_put_df_list, "datetime", "close", "volume")
+
+            #get option greeks of call focus pricelist
+            call_greeks_table = dash.no_update
+            # get option greeks of put focus pricelist
+            put_greeks_table = dash.no_update
+            #get active orders list from order book
+            active_orders_table =   dash.no_update
 
             #update NIFTY Option Chain tree table
-            SP_list = Dashboard.publish_table(Option_Chain.SP_df)
+            call_df_list    =   Option_Chain.get_focus_list_df("call")
+            put_df_list     =   Option_Chain.get_focus_list_df("put")
+            op_chain_tree_table = Dashboard.prepare_table_option_tree(call_df_list,put_df_list)
+            #op_chain_tree_table = dash.no_update
+            txt = f'op_chain_tree_table Type::{type(op_chain_tree_table)} \n Data::{op_chain_tree_table}'
+            Log.info_msg("Green", txt, True)
 
             #update NIFTY Stocks list table
             stock_list = Dashboard.publish_table(NIFTY_Stocks.stock_list)
+            #stock_list =dash.no_update
+            txt = f'stock_list Type::{type(stock_list)} \n Data::{stock_list}'
+            Log.info_msg("Green", txt, True)
 
-
-
-            return (candlestick_fig1, candlestick_fig2, new_label1, new_label2, NIFTY_Index_info, NIFTY_Stocks_info,
-                     SP_list, stock_list)
+            return (Dashboard.publish_table(Display.NIFTY_Index_data),          #1
+                    tick_stats_table,           #2
+                    NIFTY_vwap_table,           #3
+                    P_and_L_table,              #4
+                    candlestick_fig1,           #5
+                    candlestick_fig2,           #6
+                    call_fig,                   #7
+                    put_fig,                    #8
+                    call_greeks_table,          #9
+                    put_greeks_table,           #10
+                    active_orders_table,        #11
+                    op_chain_tree_table,        #12
+                    stock_list)                 #13
 
         except Exception as e:
 
             txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             print("Update failed:", e)
             # Return no_update for all 13 outputs to avoid error
@@ -4429,29 +4460,61 @@ class Display():
 
         # Initialize Dash app
         app = dash.Dash(__name__)
-
-
-        Entry_dropdown_option_df = Dashboard.create_dropdown_list("Entry Logic", 4)
-        Exit_dropdown_option_df = Dashboard.create_dropdown_list("Exit Logic", 4)
-
-        focus_call_df_list = Option_Chain.get_focus_list_df("call")
-        focus_put_df_list = Option_Chain.get_focus_list_df("put")
-
+        '''
+        NIFTY_Index_table = Dashboard.prepare_table_nif_value(NIFTY_Index.daily_df, NIFTY_Index.current_val)
+        
+        temp_df = pd.DataFrame(columns=['Address', 'strike_price', 'focus_SP', ])
         # Layout of the app
         tick_stats  =   Dashboard.update_t_count_stats(datetime.now(),Ticks.tick_count,queue_length)
+        '''
+        nif_index_value_df       = Display.NIFTY_Index_table
+        Entry_dropdown_option_df = Dashboard.create_dropdown_list("Entry Logic", 4)
+        Exit_dropdown_option_df  = Dashboard.create_dropdown_list("Exit Logic", 4)
+        tick_stats               = Display.ticks_stats
+        nif_vwap_df              = Display.NIFTY_vwap_table
+        p_and_l_df               = Display.P_and_L
 
-        app.layout = Dashboard.get_app_layout(Entry_dropdown_option_df,                     #Aval. Entry logic
-                                              Exit_dropdown_option_df,                      #Aval. Square_off logic
-                                              tick_stats,                                   #tick count and other details
-                                              Display.NIFTY_Stocks_data,                    #NIFTY stock data measurement
-                                              Order_book.calc_P_and_L(datetime.now()),      #calculate profit and loss for active investment and all day orders
-                                              focus_call_df_list,                           #List of call_df of focus list
-                                              focus_put_df_list,                            #List of put_df  of focus list
-                                              Option_Chain.SP_df,                           #Option Chain list
-                                              NIFTY_Stocks.stock_list                       #NIFTY Index stock list details
-                                              )
-        def update_charts(En_fun_sel, Ex_fun_sel, En_blk_btn, Ex_blk_btn, Liq_all_btn, de_act_btn, Frz_fcs_Lst_Updte,
-                          n_intervals, relayout_data1, relayout_data2, a):
+        # Create DataFrame with label and value columns
+        SP_list                  = ['17000', '17100', '225', '300', '375', '450', '525', '600']
+        SP_df                    = pd.DataFrame({
+                                                    'label': SP_list,
+                                                    'value': SP_list
+                                                })
+        order_book               = Order_book.Active_order_list
+
+        opt_chain_disp_tree_df   = Option_Chain.SP_df
+        nif_stocks_disp_tree_df  = NIFTY_Stocks.stock_list
+        focus_call_df            = Display.greeks_table
+        focus_put_df             = Display.greeks_table
+
+
+
+        app.layout = Dashboard.get_app_layout(nif_index_value_df,                      #1
+                                              Entry_dropdown_option_df,                      #2
+                                              Exit_dropdown_option_df,                      #3
+                                              tick_stats,                      #4
+                                              nif_vwap_df,
+                                              p_and_l_df,                   #7      #tick count and other details
+                                              SP_df ,
+                                              focus_call_df,
+                                              focus_put_df,
+                                              order_book,                      #9      #calculate profit and loss for active investment and all day order                      #10     #Option Chain list
+                                              opt_chain_disp_tree_df,           #11     #NIFTY Index stock list details
+                                              nif_stocks_disp_tree_df)      #12
+
+        def update_charts(En_fun_sel,               #1
+                          Ex_fun_sel,               #2
+                          En_blk_btn,               #3
+                          Ex_blk_btn,               #4
+                          Liq_all_btn,              #5
+                          de_act_btn,               #6
+                          sp_list,                  #7
+                          right_list,               #8
+                          qty_list,                 #9
+                          manual_order,             #10
+                          n_intervals,              #11
+                          relayout_data1,           #12
+                          relayout_data2):          #13
 
             # This object provides information about which input triggered the callback
             ctx = dash.callback_context
@@ -4485,14 +4548,6 @@ class Display():
 
                 return [dash.no_update] * 13
 
-
-            elif trigger_id in checkbox_id:
-
-                print(f'printing based on checkbox selection')
-                status = Display.update_check_box_values()
-
-                return [dash.no_update] * 13
-
             elif trigger_id in ['Freeze_Focus_List_Update']:
 
                 print(f'Focus SP List Freezed')
@@ -4503,45 +4558,53 @@ class Display():
 
                 print(f'some other trigger has been activated')
 
-                return [dash.no_update] * 13
+                return [dash.no_update] * 11
 
             return
 
         app.callback(
-            [
-                Output('candlestick-chart1', 'figure'),
-                Output('candlestick-chart2', 'figure'),
-                Output('Label 1', 'children'),
-                Output('Label 2', 'children'),
-                Output('table_NIFTY_Index', 'data'),
-                Output('table_NIFTY_Stocks', 'data'),
-                Output('L1', 'figure'),
-                Output('L2', 'figure'),
-                Output('L3', 'figure'),
-                Output('L4', 'figure'),
-                Output('L5', 'figure'),
-                Output('Option_Chain_Tree', 'data'),
-                Output('NIFTY_Stocks_List', 'data')
-            ],
-            [
-                Input('Entry_Logic', 'value'),
-                Input('Exit_Logic', 'value'),
-                Input('Entry_Block-btn', 'n_clicks'),
-                Input('Exit_Block-btn', 'n_clicks'),
-                Input('Liquidate_All-btn', 'n_clicks'),
-                Input('Code_deactivate-btn', 'n_clicks'),
-                Input('interval-component', 'n_intervals'),
+              [
+                        Output('table_nif_value', 'data'),          #1
+                        Output('table_tick_stats', 'data'),         #2
+                        Output('table_NIFTY_vwap', 'data'),         #3
+                        Output('table_P_and_L', 'data'),            #4
 
-            ],
-            [
-                State('candlestick-chart1', 'relayoutData'),
-                State('candlestick-chart2', 'relayoutData')
-            ],
+                        Output('candlestick-chart1', 'figure'),     #5
+                        Output('candlestick-chart2', 'figure'),     #6
+                        Output('call_display', 'figure'),           #7
+                        Output('put_display', 'figure'),            #8
 
-            [
-                #*checkbox_inputs
-            ]
-        )(update_charts)  # Apply the callback to the function
+                        Output('call_focus_table', 'data'),         #9
+                        Output('put_focus_table', 'data'),          #10
+                        Output('Active_order_list', 'data'),        #11
+                        Output('Option_Chain_Tree', 'data'),        #12
+                        Output('NIFTY_Stocks_List', 'data'),        #13
+
+                    ],
+                    [
+                        Input('Entry_Logic', 'value'),              #1
+                        Input('Exit_Logic', 'value'),               #2
+                        Input('Entry_Block-btn', 'n_clicks'),       #3
+                        Input('Sq_off_Block-btn', 'n_clicks'),      #4
+                        Input('Liquidate_All-btn', 'n_clicks'),     #5
+                        Input('Shutdown-btn', 'n_clicks'),          #6
+                        Input('strike_price_list', 'value'),        #7
+                        Input('right_list', 'value'),               #8
+                        Input('qty_list', 'value'),                 #9
+                        Input('manual_order', 'n_clicks'),          #10
+                        Input('interval-component', 'n_intervals'), #11
+
+                    ],
+
+                    [
+                        State('candlestick-chart1', 'relayoutData'),#1
+                        State('candlestick-chart2', 'relayoutData') #2
+                    ],
+
+                    [
+                        #*checkbox_inputs
+                    ]
+                    )(update_charts)  # Apply the callback to this function
 
         return app
 
@@ -4575,7 +4638,7 @@ class Entry_Scanners():
         except Exception as e:
 
             txt = f'Error while executing Entry Scanners start scanning thread function \nError Desc ::{e} \n{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
         finally:
 
@@ -4623,13 +4686,13 @@ class Entry_Scanners():
         except Exception as e:
 
             txt = f'Trade_in function is returning error \nError Desc ::{e} \n{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
 
         finally:
 
             txt = f'Trade_in function execution is completed'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
     @staticmethod
     def buy_trade_in(start_event, pause_event, SP_df):
@@ -4654,12 +4717,12 @@ class Entry_Scanners():
         except Exception as e:
 
             txt = f'buy_trade_in function is returning error \nError Desc ::{e} \n{traceback.format_exc()}'
-            #Log.error_msg("Yellow", txt, True)
+            #Log.error_msg("Red", txt, True)
 
         finally:
 
             txt = f'buy_trade_in function execution is completed'
-            #Log.error_msg("Yellow", txt, True)
+            #Log.error_msg("Red", txt, True)
 
     @staticmethod
     def sell_trade_in(start_event, pause_event, SP_df):
@@ -4683,12 +4746,12 @@ class Entry_Scanners():
         except Exception as e:
 
             txt = f'sell_trade_in function is returning error \nError Desc ::{e} \n{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
         finally:
 
             txt = f'sell_trade_in function execution is completed'
-            #Log.error_msg("Yellow", txt, True)
+            #Log.error_msg("Red", txt, True)
 
     @staticmethod
     def call_buy_trade_in(SP_df, call_buy_flag_sum, put_buy_flag_sum):
@@ -4730,7 +4793,7 @@ class Entry_Scanners():
         except Exception as e:
 
             txt = f"Error while execution of call_buy_trade_in.\nError Details{e}"
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             Log.error_msg("Red",
                           f"{traceback.format_exc()}",
@@ -4787,7 +4850,7 @@ class Entry_Scanners():
         except Exception as e:
 
             txt = f"Error while execution of put_buy_trade_in.\nError Details::{e}"
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             Log.error_msg("Red",
                           f"{traceback.format_exc()}",
@@ -4838,7 +4901,7 @@ class Entry_Scanners():
         except Exception as e:
 
             txt = f"Error while execution of call_sell_trade_in.\nError Details::{e}"
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             Log.error_msg("Red",
                           f"{traceback.format_exc()}",
@@ -4879,7 +4942,7 @@ class Entry_Scanners():
         except Exception as e:
 
             txt = f"Error while execution of buy_trade_in.\nError Details::{e}"
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             Log.error_msg("Red",
                           f"{traceback.format_exc()}",
@@ -5333,8 +5396,8 @@ class Exit_Scanners():
 
                             start_flag.clear()
                             return 'Success'
-                        
-                    Log.info_msg('Yellow', f'Square-off not required || order_id: {order_id}', True)
+
+                    Log.info_msg("Green", f'Square-off not required || order_id: {order_id}', True)
 
 
         except Exception as e:
@@ -5401,7 +5464,7 @@ class Exit_Scanners():
 
                     return "Success"
 
-                Log.info_msg('Yellow', f'Square-off not required || order_id: {order_id}', True)
+                Log.info_msg("Green", f'Square-off not required || order_id: {order_id}', True)
 
         except Exception as e:
 
@@ -5468,7 +5531,7 @@ class Exit_Scanners():
                             start_flag.clear()
                             return 'Success'
 
-                    Log.info_msg('Yellow', f'Square-off not required || order_id: {order_id}', True)
+                    Log.info_msg("Green", f'Square-off not required || order_id: {order_id}', True)
 
 
 
@@ -5533,7 +5596,7 @@ class Exit_Scanners():
                     start_flag.clear()
                     return 'Success'
 
-            Log.info_msg('Yellow', f'Square-off not required || order_id: {order_id}', True)
+            Log.info_msg("Green", f'Square-off not required || order_id: {order_id}', True)
 
 
         except Exception as e:
@@ -5555,116 +5618,170 @@ class Thread_Scheduler():
 
         return
 
-    def start_processing(args):
 
-        Thread_Scheduler.timer = datetime.now().replace(microsecond=0)
-
-        txt = f'{Thread_Scheduler.Thread_List.loc["TH6", "Name"]} Thread started'
-        Log.info_msg("Green", txt, True)
-
-        while Thread_Scheduler.Thread_List.loc["TH6", 'En_Flag'] == 0 \
-                and Thread_Scheduler.Thread_List.loc["TH6", 'Ex_Flag'] == 0 \
-                and datetime.now().time() < code_end_time:
-
-            current_time = datetime.now().replace(microsecond=0)
-
-            if current_time == Thread_Scheduler.timer + timedelta(seconds=1):
-
-                # 1 Update VWAP
-                Display.update_VWAP()
-
-                # 2 entry scanners update
-
-                # 3 square_off scanners update
-
-                # updating latest timer
-                Thread_Scheduler.timer = current_time
-
-            elif current_time > Thread_Scheduler.timer + timedelta(seconds=1):
-
-                txt = f'code is taking {current_time} - {Thread_Scheduler.timer} seconds to perform the operation'
-                Log.error_msg("Yellow", txt, True)
-
-                Thread_Scheduler.timer = datetime.now().replace(microsecond=0)
-
-            sleep(0.2)
-
-        # Signaling successful exit from start_exit_scanners
-        Thread_Scheduler.Thread_List.loc["TH6", "Ex_Flag"] = 1
-        Thread_Scheduler.Thread_List.loc["TH6", "En_Flag"] = 1
-
-        txt = f'{Thread_Scheduler.Thread_List.loc["TH6", "Name"]} Thread has been terminated succesfully'
-        Log.info_msg("Green", txt, True)
-
-        return "Success"
 
     @staticmethod
-    def start_threads_and_processes(start_events, pause_events, ticks_queue,option_chain_queue, nif_stocks_queue,
-                                    nif_index_queue, queue_length):
+    def start_thread(event_list):
+
+
+        global start_events,pause_events
+
+
+        for each_event_name in event_list:
+
+            if each_event_name == "data_archiever":
+
+                start_events[each_event_name].set()
+                pause_events[each_event_name].clear()
+
+            else :
+
+                start_events[each_event_name].set()
+                pause_events[each_event_name].set()
+
+            return "Success"
+
+    @staticmethod
+    def pause_thread(event_list):
+
+        global start_events, pause_events
+
+        for each_event_name in event_list:
+
+            if each_event_name == "data_archiever":
+
+
+                pause_events[each_event_name].set()
+
+            else:
+
+                pause_events[each_event_name].clear()
+
+            return "Success"
+
+
+    @staticmethod
+    def initiate_threads(thread_name_list):
 
         try:
+
+            global start_events,pause_events
+            global ticks_queue, option_chain_queue, nif_stocks_queue, nif_index_queue
+
             threads = []
             processes = []
+            for thread_name in thread_name_list:
 
-            # Defining Data Achiever Thread
-            t2 = threading.Thread(
+                if thread_name == 'data_archiever':
 
-                target=Thread_Scheduler.OC_STK_auto_archival,
-                args=
-                ("09:15:00",
-                 "15:30:00",
-                 5,
-                 start_events['data_archiever'],
-                 pause_events['data_archiever'])
+                    # Defining Data Achiever Thread
+                    df_arc_th1 = threading.Thread(target=Thread_Scheduler.OC_STK_auto_archival,
+                                                 args=("09:15:00",                             #market start time
+                                                        "15:30:00",                             #market end time
+                                                        5,                                      #time interval for archival
+                                                        start_events['data_archiever'],         #start_event_flag
+                                                        pause_events['data_archiever'])         #pause execution event flag
+                                                 )
+                    df_arc_th1.start()
+                    threads.append(df_arc_th1)
+                    txt = 'Auto Archival thread initiated to archieve data frames older than 5 minutes'
+                    Log.info_msg("Green",txt,True)
 
-            )
+                elif thread_name == 'ticks_manager':
 
-            # Defining threads for loading data from secondary queue to dataframe
-            t1 = threading.Thread(
+                    # Defining threads for loading data from secondary queue to dataframe
 
-                target=Ticks.ticks_manager, args=(
-                    option_chain_queue,
-                    nif_stocks_queue,
-                    nif_index_queue,
-                    start_events['ticks_manager'],
-                    pause_events['ticks_manager'],
-                )
-            )
 
-            # Defining seperate process on a processor to load the data from main queue to secondary queue
-            consumer_proc = multiprocessing.Process(
+                    ticks_mgr_th2 = threading.Thread(target=Ticks.ticks_manager,
+                                                     args=( option_chain_queue,
+                                                             nif_stocks_queue,
+                                                             nif_index_queue,
+                                                             start_events['ticks_manager'],
+                                                             pause_events['ticks_manager'],
+                                                          )
+                                          )
+                    ticks_mgr_th2.start()
+                    threads.append(ticks_mgr_th2)
+                    txt = 'Ticks Manager thread initiated to move data across queue'
+                    Log.info_msg("Green", txt, True)
 
-                target=Ticks.consumer, args=(
-                    ticks_queue,
-                    option_chain_queue,
-                    nif_index_queue,
-                    nif_stocks_queue,
-                    start_events['consumer'],
-                    pause_events['consumer'],
-                )
-            )
+                elif  thread_name == 'consumer':
 
-            
-            # starting background threads and processes
-            t1.start()
-            consumer_proc.start()
-            t2.start()
+                    # Defining process on a separate processor to load the data from main queue to secondary queue
 
-            t3 = Option_Chain.evaluate_OP(start_events['entry_scanner'],pause_events['entry_scanner'])
-            t4 = Entry_Scanners.Start_scanning(start_events['trade_entry'],pause_events['trade_entry'])
-            threads = [t1, t2] +t3
-            processes = [consumer_proc]
+
+                    consumer_proc = multiprocessing.Process(target=Ticks.consumer,
+                                                            args=(ticks_queue,
+                                                                  option_chain_queue,
+                                                                  nif_index_queue,
+                                                                  nif_stocks_queue,
+                                                                  start_events['consumer'],
+                                                                  pause_events['consumer'],
+                                                                )
+                                                            )
+                    consumer_proc.start()               # starting background processes
+                    processes.append(consumer_proc)
+                    txt = 'Ticks consumer process initiated to consume data from main queue to respective queues'
+                    Log.info_msg("Green", txt, True)
+
+                elif thread_name == 'entry_scanner':
+
+                    Eval_entry_th3 = Option_Chain.evaluate_OP(start_events['entry_scanner'], pause_events['entry_scanner'])
+                    #append is not required as no thread is started by above command control happens only through flags for exit and pause
+                    txt = 'Entry scanner thread initiated to check for favourable entry conditions'
+                    Log.info_msg("Green", txt, True)
+
+                elif thread_name == 'trade_entry':
+
+                    En_scanner_th4 = Entry_Scanners.Start_scanning(start_events['trade_entry'],pause_events['trade_entry'])
+                    # append is not required as no thread is started by above command control happens only through flags for exit and pause
+                    txt = 'Trade Entry thread initiated to make buy execution if flags are set for respective SP'
+                    Log.info_msg("Green", txt, True)
+
+                elif thread_name == 'program_parameters':
+
+                    update_parameters_th5 = threading.Thread(target=IP.update_parameters,
+                                                         args=(
+                                                                 start_events['program_parameters'],
+                                                                 pause_events['program_parameters'],
+                                                              )
+                                                         )
+                    update_parameters_th5.start()
+                    threads.append(update_parameters_th5)
+                    txt = 'Update parameters thread initiated to update input decision making parameters'
+                    Log.info_msg("Green", txt, True)
+
+                elif thread_name == 'dashboard':
+                    global app
+                    display_dash_th6 = threading.Thread(target=Display.run_app,
+                                                         args=(app,)
+                                                         )
+
+                    display_dash_th6.start()
+                    threads.append(display_dash_th6)
+
+                else:
+
+                    txt = f'unknown thread name initiated'
+                    Log.debug_msg("White",txt,True)
 
             return threads, processes
 
         except Exception as oe:
 
-            txt = f"Unknown type of error happened at start_threads_and_processes"
+            txt = f"Unknown type of error happened at initiate_threads"
             Log.error_msg('Red',txt,True)
             txt = f'Error Details::{oe}'
             Log.error_msg('Red',txt,True)
 
+            Log.error_msg("Red",
+                          f"Initiate threads crashed: {traceback.format_exc()}",
+                          True)
+
             return threads, processes
+
+
+
     @staticmethod
     def OC_STK_auto_archival(start_time, end_time, time_gap,
                              start_event: threading.Event,
@@ -5689,7 +5806,7 @@ class Thread_Scheduler():
         try:
             while start_event.is_set():
                 if idx >= len(schedule):
-                    Log.info_msg("Yellow",
+                    Log.info_msg("Green",
                                  "Archival worker exiting due as all time slots in databse are processed.Thank you.", True)
                     break
 
@@ -5785,7 +5902,7 @@ class Thread_Scheduler():
                 else:
 
                     txt = "Option Chain data_archiver ran into some problem"
-                    Log.info_msg(txt, True)
+                    Log.info_msg("Green",txt, True)
 
                 sleep(0.5)
 
@@ -5820,151 +5937,6 @@ class Thread_Scheduler():
         Log.info_msg("Green", txt, True)
 
         return "Success"
-
-    def start_new_thread(Thread_no):
-
-        # define variables
-        function_name = Thread_Scheduler.Thread_List.loc[Thread_no, "Name"]
-        args = Thread_Scheduler.Thread_List.loc[Thread_no, "args"]
-        module_name = Thread_Scheduler.Thread_List.loc[Thread_no, "class_name"]
-        target_function = getattr(globals()[module_name], function_name)
-
-        # define new Thread
-        Thread_t = threading.Thread(target=target_function, args=(args,))
-
-        section = 1
-        # store initialisation information in Threads variable
-        Thread_Scheduler.Thread_List.loc[Thread_no, "Address"] = Thread_t
-
-        section = 2
-        # Reset Entry flag and start the thread to prevent duplicate start up of threads
-        Thread_Scheduler.Thread_List.loc[Thread_no, "En_Flag"] = 0
-        Thread_Scheduler.Thread_List.loc[Thread_no, "Ex_Flag"] = 0
-
-        section = 3
-        # start the thread
-        Thread_t.start()
-
-        section = 4
-        # print success message and save in system message var
-        txt = f'Thread No.{Thread_no}  :- {function_name}  of {module_name} started'
-
-        return
-
-    def start_threads(thread_nos):
-
-        for Thread_no in thread_nos:
-
-            En_flag = Thread_Scheduler.Thread_List.loc[Thread_no, 'En_Flag']
-            Ex_flag = Thread_Scheduler.Thread_List.loc[Thread_no, 'Ex_Flag']
-            Address = Thread_Scheduler.Thread_List.loc[Thread_no, 'Address']
-            function_name = Thread_Scheduler.Thread_List.loc[Thread_no, "Name"]
-            args = Thread_Scheduler.Thread_List.loc[Thread_no, "args"]
-            module_name = Thread_Scheduler.Thread_List.loc[Thread_no, "class_name"]
-            thread_live = Address.is_alive() if isinstance(Address, threading.Thread) else False
-            target_function = getattr(globals()[module_name], function_name)
-            print(f'Address ::{Address} Dtype::{type(Address)}')
-
-            if En_flag == 1 and Ex_flag == 0 and thread_live == False:
-
-                Thread_Scheduler.start_new_thread(Thread_no)
-
-            elif En_flag == 1 and Ex_flag == 1 and thread_live == False and isinstance(Address,
-                                                                                       threading.Thread) == True:
-
-                Thread_Scheduler.restart_thread(Thread_no)
-
-            elif En_flag == 0 and Ex_flag == 0 and thread_live == True:
-
-                print(f'Thread is already active probably in sleep mode')
-
-            elif isinstance(Address, threading.Thread) != True:
-
-                Thread_Scheduler.start_new_thread(Thread_no)
-
-        return
-
-    def stop_threads(Thread_nos):
-        try:
-            section = 1
-            for Thread_no in Thread_nos:
-
-                # Defining Alias Name
-                En_flag = Thread_Scheduler.Thread_List.loc[Thread_no, 'En_Flag']
-                Ex_flag = Thread_Scheduler.Thread_List.loc[Thread_no, 'Ex_Flag']
-                Address = Thread_Scheduler.Thread_List.loc[Thread_no, 'Address']
-                Name = Thread_Scheduler.Thread_List.loc[Thread_no, 'Name']
-                if En_flag == 0:
-
-                    # Check if Thread is active
-                    if Address.is_alive() == True:
-
-                        # Disable Entry flag
-                        Thread_Scheduler.Thread_List.loc[Thread_no, 'En_Flag'] = 1
-
-                        # Waiting for the thread o finish operation of entire code and make safe exit
-                        while Address.is_alive() == True:
-                            txt = f"Waiting for Thread No.{Thread_no}  {Name} to terminate"
-                            Log.info_msg("Green", txt, True)
-                            sleep(0.5)
-
-                        # Closing thread
-                        txt = f"{Name} Thread terminated forcefully"
-                        Log.info_msg("Green", txt, True)
-                        Address.join()
-
-                    else:
-
-                        txt = f"{Name} Thread is already dead"
-                        Log.info_msg("Green", txt, True)
-
-
-                else:
-
-                    txt = f"{Name} Thread is already inactive"
-                    Log.info_msg("Green", txt, True)
-
-            return "Success"
-
-        except Exception as e:
-
-            txt = f'Error in stop_threads function  at section {section}'
-            Log.error_msg("Yellow", txt, True)
-
-            txt = f'{traceback.format_exc()}'
-            Log.error_msg("Yellow", txt, True)
-
-            return e
-
-    def restart_thread(Thread_no):
-
-        En_flag = Thread_Scheduler.Thread_List.loc[Thread_no, 'En_Flag']
-        Ex_flag = Thread_Scheduler.Thread_List.loc[Thread_no, 'Ex_Flag']
-        Address = Thread_Scheduler.Thread_List.loc[Thread_no, 'Address']
-        function_name = Thread_Scheduler.Thread_List.loc[Thread_no, "Name"]
-        args = Thread_Scheduler.Thread_List.loc[Thread_no, "args"]
-        module_name = Thread_Scheduler.Thread_List.loc[Thread_no, "class_name"]
-        target_function = getattr(globals()[module_name], function_name)
-
-        # close old thread using join method
-        Address.join()
-
-        # start new Thread
-        Thread_t1 = threading.Thread(target=target_function, args=(args,))
-
-        # store initialisation information in Threads variable
-        Thread_Scheduler.Thread_List.loc[Thread_no, 'Address'] = Thread_t1
-
-        # Reset flag to start new thread
-        Thread_Scheduler.Thread_List.loc[Thread_no, 'En_Flag'] = 0
-        Thread_Scheduler.Thread_List.loc[Thread_no, 'Ex_Flag'] = 0
-
-        # start the thread with new details
-        Thread_t1.start()
-
-        # print success message and save in system message var
-        txt = f'Restarted Thread No.{Thread_no}  :- {function_name}  of {module_name}'
-        Log.info_msg("Green", txt, True)
 
     @staticmethod
     def option_chain_worker(oc_queue: multiprocessing.Queue(),
@@ -6215,10 +6187,12 @@ class Ticks:
                  queue_threshold=0):
 
         # waiting for start signal
-        print(f'Ticks Consumer function is waiting for start signal', flush=True)
+        txt = f'Ticks Consumer function is waiting for start signal'
+        Log.info_msg('Green',txt,True)
 
         start_event.wait()
-        print(f'Ticks Consumer recieved the start signal', flush=True)
+        txt = f'Ticks Consumer recieved the start signal'
+        Log.info_msg('Green', txt, True)
 
         while start_event.is_set():
 
@@ -6230,7 +6204,7 @@ class Ticks:
 
                 if not was_paused:
                     txt = f'consumer execution paused.......'
-                    print(txt, flush=True)
+                    Log.info_msg('Green', txt, True)
                     was_paused = True
 
             pause_event.wait()
@@ -6260,7 +6234,7 @@ class Ticks:
             Ticks.tick_count += 1
         except queue.Full:
             txt = f'Queue is full, dropping data. Queue Size: {Ticks.dic.qsize()}'
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
     @staticmethod
     def associate(threshold_limit=1):
@@ -6282,7 +6256,7 @@ class Ticks:
         except Exception as e:
 
             txt = "Error in handling Ticks"
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
             Log.error_msg('Red', e, True)
 
             return e
@@ -6344,10 +6318,10 @@ class Ticks:
 
         except Exception as e:
             txt = "Function ran into some problem in ticks_manager"
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             txt = traceback.format_exc()
-            Log.error_msg("Yellow", txt, True)
+            Log.error_msg("Red", txt, True)
 
             return e
 
@@ -6369,7 +6343,7 @@ class Ticks:
                   nif_stocks_queue: multiprocessing.Queue(), ):
         try:
 
-            txt = f'Ticks processor started'
+            #txt = f'Ticks processor started'
             #Log.info_msg('Green', txt, True)
 
             ticks = {k: float(v) if k in ['open', 'high', 'low', 'close', 'volume', 'oi', 'strike_price'] else v for
@@ -6393,7 +6367,7 @@ class Ticks:
 
             else:
                 txt = "Ticks not identified correctly"
-                Log.error_msg("Yellow", txt, True)
+                Log.error_msg("Red", txt, True)
 
             # txt = f'nif_stocks_queue {nif_stocks_queue.qsize()}  || nif_index_queue{nif_index_queue.qsize()} || option_chain_queue {option_chain_queue.qsize()}'
             # Log.info_msg("Green",txt,True)

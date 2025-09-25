@@ -29,8 +29,28 @@ class Dashboard():
 
 
     @staticmethod
-    def get_app_layout(nif_index_value_df,entry_logic_drop_down_list,exit_drop_down_layout_list,tick_stats,nif_vwap_df,p_and_l_df,focus_call_df_list,focus_put_df_list,opt_chain_disp_tree_df,nif_stocks_disp_tree_df):
+    def get_app_layout(
+                        nif_index_value_df,             # 1
+                        entry_logic_drop_down_df,       # 2
+                        exit_drop_down_layout_df,       # 3
+                        tick_stats,                     # 4
+                        nif_vwap_df,                    # 5
+                        p_and_l_df,                     # 6
+                        strike_price_df,                # 7
+                        focus_call_df,                  # 8
+                        focus_put_df,                   # 9
+                        order_book,                     # 10
+                        opt_chain_disp_tree_df,         # 11
+                        nif_stocks_disp_tree_df):       # 12
         try:
+           right_list = pd.DataFrame({'label': ['call', 'put'], 'value': ['call', 'put']})
+           qty_list   = ['75', '150', '225', '300', '375', '450', '525', '600']
+           # Create DataFrame with label and value columns
+           qty_df     = pd.DataFrame({
+                                           'label': qty_list,
+                                           'value': qty_list
+                                       })
+
            #Entire Page container layout
            layout = html.Div(
                             [
@@ -38,109 +58,185 @@ class Dashboard():
                                   html.Div(
                                   [
 
-                                            # header 1 column 1 First Object containing NIFTY 50 Value Labels and dropdowns
-                                            html.Div(
-                                            [
-                                                        Dashboard.create_dash_table('table_nif_value',nif_index_value_df, "100%", 10),
-                                                        Dashboard.create_dash_dropdown("Entry_Logic", entry_logic_drop_down_list, 0),
-                                                        Dashboard.create_dash_dropdown("Exit_Logic", exit_drop_down_layout_list, 0),
+                                                    # header 1 column 1 First Object containing NIFTY 50 Value Labels and dropdowns
+                                                    html.Div(
+                                                    [
+                                                                Dashboard.create_dash_table('table_nif_value',nif_index_value_df, "100%", 10),
+                                                                Dashboard.create_dash_dropdown("Entry_Logic", entry_logic_drop_down_df, 0),
+                                                                Dashboard.create_dash_dropdown("Exit_Logic", exit_drop_down_layout_df, 0),
 
-                                                    ], style={
-                                                                'display': 'flex',              # Enables Flexbox layout for child elements
-                                                                'flexDirection': 'column',      # Stacks child elements vertically (top to bottom)
-                                                                'alignItems': 'flex-start',     # Aligns children to the start of the cross-axis (left edge)
-                                                                'gap': '10px',                  # Adds 10px vertical spacing between stacked children
-                                                                'marginRight': '20px'           # Adds 20px space to the right of this container (useful for column separation)
+                                                            ], style={
+                                                                        'display': 'flex',              # Enables Flexbox layout for child elements
+                                                                        'flexDirection': 'column',      # Stacks child elements vertically (top to bottom)
+                                                                        'alignItems': 'flex-start',     # Aligns children to the start of the cross-axis (left edge)
+                                                                        'gap': '10px',                  # Adds 10px vertical spacing between stacked children
+                                                                        'marginRight': '20px'           # Adds 20px space to the right of this container (useful for column separation)
 
-                                                              }
-                                                    ),
+                                                                      }
+                                                            ),
 
-                                            # Header 1:column 2 :It contains buttons  used to control program parameters
-                                            html.Div(
-                                            [
-                                                        Dashboard.create_dash_buttons('Entry_Block-btn', 'Block Entry'),
-                                                        Dashboard.create_dash_buttons('Sq_off_Block-btn', 'Hold all Trades'),
-                                                        Dashboard.create_dash_buttons('Liquidate_All-btn', 'Liquidate All'),
-                                                        Dashboard.create_dash_buttons('Shutdown-btn', 'Shutdown code'),
-                                                    ], style={
-                                                                'display': 'flex',              # Enables Flexbox layout for child elements
-                                                                'flexDirection': 'column',      # Stacks child elements vertically (top to bottom)
-                                                                'alignItems': 'flex-start',     # Aligns children to the start of the cross-axis (left edge)
-                                                                'gap': '10px',                  # Adds 10px vertical spacing between stacked children
-                                                                'marginRight': '20px'           # Adds 20px space to the right of this container (useful for column separation)
+                                                    # Header 1:column 2 :It contains buttons  used to control program parameters
+                                                    html.Div(
+                                                    [
+                                                                Dashboard.create_dash_buttons('Entry_Block-btn', 'Block Entry'),
+                                                                Dashboard.create_dash_buttons('Sq_off_Block-btn', 'Block Sq. Off'),
+                                                                Dashboard.create_dash_buttons('Liquidate_All-btn', 'Liquidate All'),
+                                                                Dashboard.create_dash_buttons('Shutdown-btn', 'Shutdown code'),
+                                                            ], style={
+                                                                        'display': 'flex',              # Enables Flexbox layout for child elements
+                                                                        'flexDirection': 'column',      # Stacks child elements vertically (top to bottom)
+                                                                        'alignItems': 'flex-start',     # Aligns children to the start of the cross-axis (left edge)
+                                                                        'gap': '10px',                  # Adds 10px vertical spacing between stacked children
+                                                                        'marginRight': '20px'           # Adds 20px space to the right of this container (useful for column separation)
 
-                                                              },
-                                                    ),
-                                            html.Div(
-                                            [
+                                                                      },
+                                                            ),
+                                                    html.Div(
+                                                    [
 
-                                                        Dashboard.create_dash_table('table_tick_stats', tick_stats, "100%", 10),
-                                                    ], style={
-                                                                'display': 'inline-block',     # Allows the element to sit inline with others, but still accept width/height styling
-                                                                'marginLeft': '10px',          # Adds 10px spacing to the left of the element (separates it from its left neighbor)
-                                                                'marginRight': '10px',         # Adds 10px spacing to the right of the element (separates it from its right neighbor)
-                                                                'marginBottom': '5px'          # Adds 5px spacing below the element (useful for vertical stacking or padding)
-                                                             }
-                                                    ),
+                                                                Dashboard.create_dash_table('table_tick_stats', tick_stats, "100%", 10),
+                                                            ], style={
+                                                                        'display': 'inline-block',     # Allows the element to sit inline with others, but still accept width/height styling
+                                                                        'marginLeft': '10px',          # Adds 10px spacing to the left of the element (separates it from its left neighbor)
+                                                                        'marginRight': '10px',         # Adds 10px spacing to the right of the element (separates it from its right neighbor)
+                                                                        'marginBottom': '5px'          # Adds 5px spacing below the element (useful for vertical stacking or padding)
+                                                                     }
+                                                            ),
 
-                                            html.Div(
-                                            [
-                                                        Dashboard.create_dash_table('table_NIFTY_vwap', nif_vwap_df, "100%", 10),
-                                                    ], style={
-                                                                'display': 'inline-block',     # Allows the element to sit inline with others, but still accept width/height styling
-                                                                'marginLeft': '10px',          # Adds 10px spacing to the left of the element (separates it from its left neighbor)
-                                                                'marginRight': '10px',         # Adds 10px spacing to the right of the element (separates it from its right neighbor)
-                                                                'marginBottom': '5px'          # Adds 5px spacing below the element (useful for vertical stacking or padding)
-                                                             },
-                                                    ),
+                                                    html.Div(
+                                                    [
+                                                                Dashboard.create_dash_table('table_NIFTY_vwap', nif_vwap_df, "100%", 10),
+                                                            ], style={
+                                                                        'display': 'inline-block',     # Allows the element to sit inline with others, but still accept width/height styling
+                                                                        'marginLeft': '10px',          # Adds 10px spacing to the left of the element (separates it from its left neighbor)
+                                                                        'marginRight': '10px',         # Adds 10px spacing to the right of the element (separates it from its right neighbor)
+                                                                        'marginBottom': '5px'          # Adds 5px spacing below the element (useful for vertical stacking or padding)
+                                                                     },
+                                                            ),
 
-                                            # need to Put P&L summary here in df format
-                                            html.Div(
-                                            [
-                                                        Dashboard.create_dash_table('table_P_and_L', p_and_l_df, "100%", 10),
-                                                    ], style={
-                                                                'display': 'inline-block',     # Allows the element to sit inline with others, but still accept width/height styling
-                                                                'marginLeft': '10px',          # Adds 10px spacing to the left of the element (separates it from its left neighbor)
-                                                                'marginRight': '10px',         # Adds 10px spacing to the right of the element (separates it from its right neighbor)
-                                                                'marginBottom': '5px'          # Adds 5px spacing below the element (useful for vertical stacking or padding)
-                                                             },
-                                                    ),
+                                                    # need to write P&L summary here in df format
+                                                    html.Div(
+                                                    [
+                                                                Dashboard.create_dash_table('table_P_and_L', p_and_l_df, "100%", 10),
+                                                            ], style={
+                                                                        'display': 'inline-block',     # Allows the element to sit inline with others, but still accept width/height styling
+                                                                        'marginLeft': '10px',          # Adds 10px spacing to the left of the element (separates it from its left neighbor)
+                                                                        'marginRight': '10px',         # Adds 10px spacing to the right of the element (separates it from its right neighbor)
+                                                                        'marginBottom': '5px'          # Adds 5px spacing below the element (useful for vertical stacking or padding)
+                                                                     },
+                                                            ),
+                                                    # Manual ordering window for Algo trading
+                                                    html.Div(
+                                                    [
+                                                            html.Div(
+                                                            [
+                                                                        html.H2("Manual Order Panel",style={'fontSize': '18px', 'marginBottom': '6px'}),  # header reduced
+                                                                        # Smaller dropdowns
+                                                                        Dashboard.create_dash_dropdown("strike_price_list",strike_price_df, 0),
+                                                                        Dashboard.create_dash_dropdown("right_list", right_list, 0),
+                                                                        Dashboard.create_dash_dropdown("qty_list", qty_df, 0),
 
-                                            ], style={
+                                                                        # Larger button
+                                                                        Dashboard.create_dash_buttons('manual_order','Place Order'),
+                                                                    ], style={
+                                                                        'display': 'flex',              # Enables Flexbox layout (all children follow flex rules instead of normal block flow)
+                                                                        'flexDirection': 'row',         # Stacks child elements horizontally from left to right
+                                                                        'gap': '10px',                  # Adds 10px vertical spacing between each dropdown and the button
+                                                                        'alignItems': 'stretch',        # Stretches all children (dropdowns & button) to the same width
+                                                                        'marginLeft': '10px',           # Adds 10px space on the left side (separates panel from neighbors)
+                                                                        'marginRight': '10px',          # Adds 10px space on the right side
+                                                                        'marginBottom': '5px',          # Adds 5px space below the panel (separates from content below)
+                                                                        'backgroundColor': '#FFFACD',   # Fills panel background with light yellow color
+                                                                        'padding': '10px',              # Adds inner spacing (content won’t touch the panel’s edges)
+                                                                        'borderRadius': '5px'           # Rounds corners of the panel box for a softer look
+                                                                        },
+                                                                    ),
+                                                            ], style={
+                                                                        'display': 'flex',              # Activates Flexbox layout, allowing child elements to be aligned and spaced dynamically
+                                                                        'flexDirection': 'row',         # Arranges child elements horizontally from left to right
+                                                                        'alignItems': 'flex-start',     # Aligns children to the top of the container (start of the cross-axis)
+                                                                        'marginBottom': '20px'          # Adds 20px spacing below this container, useful for separating stacked sections
+                                                                      }
+                                                            ),
+                                          ],style={
                                                         'display': 'flex',              # Activates Flexbox layout, allowing child elements to be aligned and spaced dynamically
                                                         'flexDirection': 'row',         # Arranges child elements horizontally from left to right
                                                         'alignItems': 'flex-start',     # Aligns children to the top of the container (start of the cross-axis)
                                                         'marginBottom': '20px'          # Adds 20px spacing below this container, useful for separating stacked sections
-                                                      }
-                                            ),
-                                  #Second vertical container storing NIFTY 50 historical performance and current live trends
+                                                  },
+                                          ),
+
+                                  # Second vertical container - candlestick charts
                                   html.Div(
                                   [
                                                 Dashboard.create_dash_candlestick_chart('candlestick-chart1'),
                                                 Dashboard.create_dash_candlestick_chart('candlestick-chart2'),
-                                           ], style={
-                                                        'display': 'flex',              # Activates Flexbox layout, allowing child elements to be aligned and spaced dynamically
-                                                        'flexDirection': 'row',         # Arranges child elements horizontally from left to right
-                                                        'alignItems': 'flex-start',     # Aligns children to the top of the container (start of the cross-axis)
-                                                        'marginBottom': '20px'          # Adds 20px spacing below this container, useful for separating stacked sections
-                                                      },
-                                            ),
-                                  #Third Vertical Container storing line charts of call and Put data of closet 5 strike prices
+                                          ],style={
+                                                        'display': 'flex',
+                                                        'flexDirection': 'row',
+                                                        'width': '100%',
+                                                        'gap': '20px',
+                                                        'alignItems': 'stretch'  # 🔑 ensures both charts align by height
+                                                    },
+                                          ),
+
+                                  # Third vertical container - call & put charts + tables
                                   html.Div(
                                   [
-                                                Dashboard.create_price_volume_chart("call_display", focus_call_df_list, "datetime", "close", "volume"),
-                                                Dashboard.create_price_volume_chart("put_display", focus_put_df_list, "datetime", "close", "volume")
-                                          ], style={
-                                                        'display': 'flex',           # Enables Flexbox layout, allowing flexible alignment and spacing of child elements
-                                                        'flexDirection': 'row',      # Arranges child elements in a horizontal line (left to right)
-                                                        'width': '90%'               # Sets the container width to 90% of its parent, leaving some margin on either side
-                                                    },
 
-                                          ),
+                                           html.Div(
+                                           [
+                                                       Dashboard.create_line_plot("call_display") ,
+                                                       Dashboard.create_dash_table("call_focus_table",
+                                                                                                     focus_call_df, "800px",
+                                                                                                     5)
+
+                                                   ],style={
+                                                                'display': 'flex',
+                                                                'flexDirection': 'column',
+                                                                #'flex': '1',
+                                                                'width': '800px',
+                                                                'gap':'15px',
+                                                                'alignItems': 'stretch'
+                                                                # ensures children stretch full width
+                                                            }
+                                                    ),
+                                           html.Div(
+                                           [
+                                                        Dashboard.create_line_plot("put_display"),
+                                                        Dashboard.create_dash_table("put_focus_table",
+                                                                                                 focus_put_df, "800px",
+                                                                                                 5),
+
+                                                    ],style={
+                                                                'display': 'flex',
+                                                                'flexDirection': 'column',
+                                                                #'flex': '1',
+                                                                'width': '800px',
+                                                                'gap': '15px',
+                                                                'alignItems': 'stretch'
+                                                            },
+                                                    )
+                                  ],style={
+                                            'display': 'flex',
+                                            'flexDirection': 'row',
+                                            'width': '100%',
+                                            'gap': '20px',
+                                            'alignItems': 'stretch'  # 🔑 aligns left and right blocks properly
+                                           },
+                                  ),
                                   #Fourth vertical container for display of Option chain tree and NIFTY 50 Stock dynamics
                                   html.Div(
                                   [
-                                                html.Div(
+
+                                              html.Div(
+                                                  [
+                                                      html.H2("Active Holdings List", style={'textAlign': 'center'}),
+                                                      Dashboard.create_dash_table('Active_order_list', order_book,
+                                                                                  "100%", 10),
+                                                  ], style={'flex': '1'}),
+
+                                              html.Div(
                                                 [
                                                            html.H2("Option Chain Tree", style={'textAlign': 'center'}),
                                                            Dashboard.create_dash_table('Option_Chain_Tree', opt_chain_disp_tree_df, "100%", 10),
@@ -153,14 +249,14 @@ class Dashboard():
                                                         ], style={'flex': '1'}),
                                           ], style={
                                                         'display': 'flex',               # Enables Flexbox layout, allowing flexible arrangement of child elements
-                                                        'flexDirection': 'row',          # Aligns child elements horizontally from left to right
+                                                        'flexDirection': 'column',          # Aligns child elements horizontally from left to right
                                                         'alignItems': 'flex-start',      # Vertically aligns children to the top of the container
                                                         'justifyContent': 'space-around',# Distributes child elements evenly with space around them (left/right padding between items)
                                                         'width': '100%',                 # Makes the container span the full width of its parent
                                                         'marginBottom': '20px'           # Adds spacing below the container to separate it from the next section
                                                     },
 
-                                            ),
+                                          ),
                                   #Fifth Invisible container used to update entire page at regular interval
                                   html.Div(
                                   [
@@ -175,11 +271,14 @@ class Dashboard():
                             ]
                            )
 
+
            return layout
-        except:
 
-            return None
-
+        except Exception as e:
+               import traceback
+               print("Error in get_app_layout:", e)
+               traceback.print_exc()
+               return None
 
 
     @staticmethod
@@ -254,9 +353,10 @@ class Dashboard():
         return dcc.Graph(
                             id      =chart_id,
                             style   ={
-                                        'width': '100%',
-                                        'height': '95%',
-                                        'border': '1px solid gray'
+                                        'width': '800px',
+                                        'height': '600px',
+                                        'border': '1px solid gray',  # Draw a gray border
+
                                     }
                         )
 
@@ -298,8 +398,16 @@ class Dashboard():
 
     @staticmethod
     def create_dash_table(table_id,df,td_width,page_size):
-        
-        
+
+        if df is None or df.empty:
+            return dash_table.DataTable(
+                id=table_id,
+                columns=[],
+                data=[],
+                style_table={'width': td_width},
+                page_size=page_size
+            )
+
         #1 convert all data to text which can be read by plotly and send to browser for display
         df  =   df.astype(str)
         
@@ -318,7 +426,7 @@ class Dashboard():
                                                          },
                                            style_cell  =  {
                                                             'minWidth': '100px',          # Set minimum width for cells
-                                                            'maxWidth': '200px',          # Set maximum width for cells
+                                                            'maxWidth': '800px',          # Set maximum width for cells
                                                             'overflow': 'hidden',         # Hide content that overflows the cell
                                                             'textOverflow': 'ellipsis',   # Show ellipsis for truncated text
                                                             'textAlign': 'center',        # Center-align cell content 
@@ -343,10 +451,8 @@ class Dashboard():
         #converting dataframe data to text which can be read and shown by plotly to browser
         
           df        =  df.astype(str)
-          
           table     =  df.to_dict('records') 
-          
-          
+
           return table
 
     @staticmethod
@@ -382,31 +488,43 @@ class Dashboard():
           return df
 
     @staticmethod
-    def create_dash_dropdown(dropdown_id,dropdown_df,default_option):
-      
-      dropdown_records  =   dropdown_df.to_dict('records')
-      
-      default_value     =   dropdown_records[default_option]['value']
-      
-      drop_down         =   dcc.Dropdown(
-                                              id        =   dropdown_id,                                             
-                                              options   =   dropdown_records,                                                             
-                                              value     =   default_value,                       # Default selected value                                             
-                                              style     =   {   'marginRight'   : '5px',
-                                                                'marginBottom'  : '20px',
-                                                                'marginLeft'    : '5px',
-                                                                'width'         : '200px',       # Set width
-                                                                'height'        : '10px',        # Set height (if needed)
-                                                                'fontSize'      : '12px'         # Font size of the options
-                                                              }
-                                          )
-      
-      return drop_down
+    def create_dash_dropdown(dropdown_id, dropdown_df, default_option=0):
+        # Handle None or empty DataFrame
+        if dropdown_df is None or dropdown_df.empty:
+            dropdown_records = []
+        else:
+            dropdown_records = dropdown_df.to_dict('records')
+
+        # Handle invalid default_option
+        if not dropdown_records or default_option >= len(dropdown_records):
+            default_value = None  # no default if list is empty or index out of range
+        else:
+            default_value = dropdown_records[default_option]['value']
+
+        return dcc.Dropdown(
+            id=dropdown_id,
+            options=[
+                {"label": rec.get("label", str(rec.get("value", ""))), "value": rec["value"]}
+                for rec in dropdown_records
+            ],
+            value=default_value,
+            placeholder="No options available" if not dropdown_records else "Select an option",
+            clearable=False,
+            style={
+                "width": "100px"  # set fixed width
+            }
+        )
 
     @staticmethod
     def create_dash_candlestick_chart(cs_chart_id):
       
-      cs_chart =  dcc.Graph(id  =   cs_chart_id, style={'height': '95%','width': '95%','border': '1px solid gray'})  
+      cs_chart =  dcc.Graph(id  =   cs_chart_id, style={'width': '800px',     # fixed width
+                                                        'height': '600px',    # fixed height
+                                                        'flex': 'none',       # prevent flexbox auto-resizing
+                                                        'border': '1px solid gray',  # Draw a gray border
+
+                                                        }
+                            )
       
       return cs_chart
 
@@ -857,20 +975,19 @@ class Dashboard():
                                             )
                                ) 
             return fig
-        
-        
-        
+
     @staticmethod
-    def create_price_volume_chart(chart_id, dataframes, x_col, y_col, volume_col):
+    def plot_price_volume_chart(dataframes, x_col, y_col, volume_col):
+
         traces = []
 
         # Define distinct colors for each line/bar pair
         color_palette = [
-            'rgba(0, 117, 44, 1)',          # Dark Emerald Green
-            'rgba(255, 233, 0, 0.9)',       # Bright Yellow
-            'rgba(0, 117, 179, 0.9)',       # Brilliant Blue
-            'rgba(255, 6, 0, 0.8)',         # Bright Red
-            'rgba(134, 134, 134, 1)'        # Medium Gray
+            'rgba(0, 117, 44, 1)',  # Dark Emerald Green
+            'rgba(255, 233, 0, 0.9)',  # Bright Yellow
+            'rgba(0, 117, 179, 0.9)',  # Brilliant Blue
+            'rgba(255, 6, 0, 0.8)',  # Bright Red
+            'rgba(134, 134, 134, 1)'  # Medium Gray
         ]
 
         # Filter each DataFrame to keep only the last 10 minutes of data
@@ -885,118 +1002,115 @@ class Dashboard():
                 print("⚠️ Skipping: No Dataframe for plotting")
                 return None  # or just return
 
-
         # rest of your processing code here
         for df in dataframes:
-            latest_time    = df[x_col].max()
+            latest_time = df[x_col].max()
             time_threshold = latest_time - timedelta(minutes=10)
-            df_filtered    = df[df[x_col] >= time_threshold]
+            df_filtered = df[df[x_col] >= time_threshold]
             filtered_dataframes.append(df_filtered)
 
         # Create traces for each filtered DataFrame
         for i, df in enumerate(filtered_dataframes):
             color = color_palette[i]
-
+            name  = df['strike_price'].iloc[0]
             # Price line trace
             traces.append(
                 go.Scatter(
-                    x       =   df[x_col],              # X-axis: timestamp
-                    y       =   df[y_col],              # Y-axis: price
-                    mode    =   'lines',                # Display as line chart
-                    name    =   f'Price Line {i + 1}',  # Legend label
-                    line    =   dict(
-                                    color=color,        # Line color
-                                    width=3             # Line thickness
-                                    ),
-                    yaxis   =   'y1',                   # Assign to primary Y-axis
-                    opacity =   0.6                     # Line transparency
+                    x=df[x_col],  # X-axis: timestamp
+                    y=df[y_col],  # Y-axis: price
+                    mode='lines',  # Display as line chart
+                    name= name,  # Legend label
+                    line=dict(
+                        color=color,  # Line color
+                        width=3  # Line thickness
+                    ),
+                    yaxis='y1',  # Assign to primary Y-axis
+                    opacity=0.6  # Line transparency
                 ))
 
             # Volume bar trace
             traces.append(
                 go.Bar(
-                        x           =df[x_col],          # X-axis: timestamp
-                        y           =df[volume_col],     # Y-axis: volume
-                        name        =f'Volume {i + 1}',  # Legend label
-                        yaxis       ='y2',               # Assign to secondary Y-axis
-                        opacity     =0.6,                # Bar transparency
-                        marker      =dict(color=color),  # Bar color
-                        offsetgroup =f'group{i}'         # Grouping for overlay
-                    ))
+                    x=df[x_col],  # X-axis: timestamp
+                    y=df[volume_col],  # Y-axis: volume
+                    name= name,  # Legend label
+                    yaxis='y2',  # Assign to secondary Y-axis
+                    opacity=0.6,  # Bar transparency
+                    marker=dict(color=color),  # Bar color
+                    offsetgroup=f'group{i}'  # Grouping for overlay
+                ))
 
         # Calculate max price and round up to next multiple of 50
         max_price = max(df[y_col].max() for df in filtered_dataframes)
-        y_max     = math.ceil(max_price / 50) * 50
+        y_max = math.ceil(max_price / 50) * 50
 
         # Calculate max volume and add buffer
         max_volume = max(df[volume_col].max() for df in filtered_dataframes)
 
         layout = go.Layout(
-                    title   =chart_id,                      # Chart title
+            # title   =chart_id,                      # Chart title
 
-                    # X-axis configuration
-                    xaxis   =dict(
-                                title       =x_col,         # X-axis label
-                                type        ='date',        # Treat x-axis as datetime
-                                tickformat  ='%H:%M',       # Format ticks as hour:minute
-                                dtick       =60000,         # Tick spacing: 1 minute (60,000 ms)
-                                showgrid    =True,          # Enable gridlines
-                                gridcolor   ='lightgrey',   # Gridline color
-                                gridwidth   =0.5            # Gridline thickness
-                            ),
+            # X-axis configuration
+            xaxis=dict(
+                title=x_col,  # X-axis label
+                type='date',  # Treat x-axis as datetime
+                tickformat='%H:%M',  # Format ticks as hour:minute
+                dtick=60000,  # Tick spacing: 1 minute (60,000 ms)
+                showgrid=True,  # Enable gridlines
+                gridcolor='lightgrey',  # Gridline color
+                gridwidth=0.5  # Gridline thickness
+            ),
 
             # Primary Y-axis (price)
             yaxis=dict(
-                        title           =y_col,         # Y-axis label
-                        range           =[0, y_max],    # Y-axis range from 0 to rounded max
-                        tickmode        ='linear',      # Evenly spaced ticks
-                        tick0           =0,             # Start ticks from 0
-                        dtick           =50,            # Tick spacing: 50 units
-                        showticklabels  =True,          # Show tick labels
-                        tickformat      =',',           # Format numbers with commas
-                        showgrid        =True,          # Enable gridlines
-                        gridcolor       ='lightgrey',   # Gridline color
-                        gridwidth       =0.5            # Gridline thickness
-                    ),
+                title=y_col,  # Y-axis label
+                range=[0, y_max],  # Y-axis range from 0 to rounded max
+                tickmode='linear',  # Evenly spaced ticks
+                tick0=0,  # Start ticks from 0
+                dtick=50,  # Tick spacing: 50 units
+                showticklabels=True,  # Show tick labels
+                tickformat=',',  # Format numbers with commas
+                showgrid=True,  # Enable gridlines
+                gridcolor='lightgrey',  # Gridline color
+                gridwidth=0.5  # Gridline thickness
+            ),
 
             # Secondary Y-axis (volume)
             yaxis2=dict(
-                        title       =volume_col,    # Y-axis label
-                        overlaying  ='y',           # Overlay on primary Y-axis
-                        side        ='right',       # Position on right side
-                        showgrid    =True,          # Enable gridlines
-                        tickmode    ='linear',      # Evenly spaced ticks
-                        tick0       =0,             # Start ticks from 0
-                        dtick       =20000,         # Tick spacing: 20,000 units
-                        tickformat  =',',           # Format numbers with commas
-                        range       =[0, max_volume + 20000],  # Y-axis range with buffer
-                        gridcolor   ='lightgrey',   # Gridline color
-                        gridwidth   =0.5            # Gridline thickness
-                    ),
+                title=volume_col,  # Y-axis label
+                overlaying='y',  # Overlay on primary Y-axis
+                side='right',  # Position on right side
+                showgrid=True,  # Enable gridlines
+                tickmode='linear',  # Evenly spaced ticks
+                tick0=0,  # Start ticks from 0
+                dtick=20000,  # Tick spacing: 20,000 units
+                tickformat=',',  # Format numbers with commas
+                range=[0, max_volume + 20000],  # Y-axis range with buffer
+                gridcolor='lightgrey',  # Gridline color
+                gridwidth=0.5  # Gridline thickness
+            ),
 
             # Legend configuration
             legend=dict(
-                        x           =0.5,           # Center horizontally
-                        y           =-0.2,          # Position below plot area
-                        xanchor     ='center',      # Anchor legend to center
-                        orientation ='h'            # Horizontal layout
-                    ),
+                x=0.5,  # Center horizontally
+                y=-0.2,  # Position below plot area
+                xanchor='center',  # Anchor legend to center
+                orientation='h'  # Horizontal layout
+            ),
 
             # Layout margins
-            margin  =dict(
-                            l=40, r=40, t=40, b=120  # Extra bottom space for legend
-                        ),
+            margin=dict(
+                l=40, r=40, t=40, b=120  # Extra bottom space for legend
+            ),
 
-            height       =600,                       # Chart height in pixels
-            barmode      ='overlay',                 # Overlay bars on same x-axis
-            plot_bgcolor ='rgba(237, 237, 237, 1)',  # Plot area background
-            paper_bgcolor='rgba(237, 237, 237, 1)'   # Entire figure background
+            height=600,  # Chart height in pixels
+            barmode='overlay',  # Overlay bars on same x-axis
+            plot_bgcolor='rgba(237, 237, 237, 1)',  # Plot area background
+            paper_bgcolor='rgba(237, 237, 237, 1)'  # Entire figure background
         )
 
-        return dcc.Graph(id     =chart_id,
-                         figure =go.Figure(data=traces, layout=layout),
-                         style  ={'height': '95%', 'width': '95%', 'border': '1px solid gray'}  # 👈 Chart container styling
-                        )
+        return go.Figure(data=traces, layout=layout)
+
     @staticmethod
     def update_t_count_stats(Time,T_count,t_pipeline):
 
@@ -1031,3 +1145,257 @@ class Dashboard():
 
 
             return
+
+    @staticmethod
+    def prepare_table_nif_value(nif_daily_df,nif_current_val):
+        """
+           Compute NIFTY 50 close and change, and return Dash-friendly table data.
+           Handles validation, computations, and exceptions gracefully.
+        """
+        try:
+            # 1) Validate input
+            if nif_daily_df is None or nif_daily_df.empty:
+                raise ValueError("nif_daily_df is empty or None")
+
+            if 'close' not in nif_daily_df.columns:
+                raise ValueError("nif_daily_df must contain a 'close' column")
+
+            # 2) Perform computation
+            previous_close  = nif_daily_df['close'].iloc[-1]
+            current_value   = nif_current_val if nif_current_val > 0 else previous_close
+            up_down         = round(current_value - previous_close, 2)
+
+            # 3) Prepare result DataFrame
+            result_df       = pd.DataFrame([{"NIFTY 50 close": f"{current_value} ({up_down})"}])
+
+        except Exception as e:
+            print(f"Error in prepare_table_nif_value: {e}")
+            # fallback DataFrame
+            result_df       = pd.DataFrame([{"NIFTY 50 close": "Data not available"}])
+
+        # 4) Final conversion (done inside function, no redundancy outside)
+        records             = result_df.astype(str).to_dict("records")
+
+        # 5) Return ready-to-use Dash table
+        return  records
+
+    @staticmethod
+    def prepare_table_tick_stats(queue_length, T_Count):
+        """
+        Prepare and publish a table with queue status and T_Count.
+
+        Args:
+            queue_length (list[int]): List of queue lengths (for all queues).
+            T_Count (int): Transaction count.
+
+        Returns:
+            Dash table component (via Dashboard.publish_table)
+        """
+        try:
+            # 1) Queue length stats
+
+
+            # 2) Format T_Count
+            t_count_str = f"{T_Count:,}"  # comma formatted
+
+            # 3) Current timestamp
+            current_time = datetime.now().strftime("%dth %b, %Y %H:%M:%S")
+
+            # 4) Create DataFrame
+            data = {    "Current Time": [current_time],
+                        "T_Count": [t_count_str],
+                        "Queue Length": [queue_length]
+                    }
+            result_df = pd.DataFrame(data)
+
+            # 5) Publish as Dash Table
+            return Dashboard.publish_table(result_df)
+
+        except Exception as e:
+            print(f"Error in compute_queue_status: {e}")
+            fallback_df = pd.DataFrame([{
+                                            "Last Updated": datetime.now().strftime("%dth %b, %Y %H:%M:%S"),
+                                            "T_Count": "N/A",
+                                            "Queue Length": "N/A",
+
+                                        }])
+
+            return Dashboard.publish_table(fallback_df)
+
+    @staticmethod
+    def prepare_table_option_greeks(*dfs):
+        """
+        Extract key option details from the latest row of each provided DataFrame
+        and combine them into a single summary table.
+
+        Time from the 'datetime' column will be written below Strike Price in the same cell.
+        """
+        summary_rows = []
+
+        for i, df in enumerate(dfs, start=1):
+
+            try:
+
+                if df is None or df.empty:
+                    continue
+
+                latest = df.iloc[-1]
+
+                # Get time string from datetime if available
+                time_str = "N/A"
+
+                if "datetime" in df.columns:
+
+                    try:
+
+                        time_str = pd.to_datetime(latest["datetime"]).strftime("%H:%M:%S")
+
+                    except Exception:
+
+                        time_str = str(latest["datetime"])
+
+                # Combine Strike Price and Time in the same cell
+                strike_time_cell = f"{latest.get('strike_price', 'N/A')}\n{time_str}"
+
+                row_data = {
+
+                                "strike_price": strike_time_cell,
+                                "right": latest.get("right", "N/A"),
+                                "close": latest.get("close", "N/A")
+                            }
+
+                # Option Greeks dynamically
+                for greek in ["delta", "gamma", "theta", "vega", "iv"]:
+                    if greek in df.columns:
+                        row_data[greek] = latest[greek]
+
+                summary_rows.append(row_data)
+
+            except Exception as e:
+                print(f"Error processing DF_{i}: {e}")
+                continue
+
+        # Convert to DataFrame
+        if summary_rows:
+            return Dashboard.publish_table(pd.DataFrame(summary_rows))
+        else:
+            return Dashboard.publish_table(pd.DataFrame(columns=[ "strike_price", "right", "close","delta", "gamma", "theta", "vega", "iv"]))
+
+    @staticmethod
+    def prepare_table_P_and_L(Active_order_list, Trx_list):
+
+            x = pd.DataFrame(columns=['Particulars','Value'])
+            x =Dashboard.publish_table(x)
+
+            return x
+    @staticmethod
+    def prepare_table_active_orders(order_df):
+            """
+            Filters relevant option columns, computes totals for numeric columns,
+            adds total row at the top, and returns a Dash-friendly table.
+            """
+            try:
+                if order_df is None or order_df.empty:
+                    raise ValueError("order_df is empty or None")
+
+                # Columns to filter
+                columns_to_keep = ["strike_price", "right", "buy_price", "hold_time",
+                                   "close", "profit/loss", "delta", "gamma", "theta",
+                                   "vega", "iv"]
+
+                # Keep only existing columns
+                filtered_columns = [col for col in columns_to_keep if col in order_df.columns]
+                filtered_df = order_df[filtered_columns].copy()
+
+                # Compute totals for numeric columns
+                numeric_cols = filtered_df.select_dtypes(include='number').columns
+                totals = {col: filtered_df[col].sum() for col in numeric_cols}
+
+                # Create a total row with string 'TOTAL' in first column if exists
+                total_row = {col: totals.get(col, "") for col in filtered_columns}
+                if filtered_columns:
+                    total_row[filtered_columns[0]] = "TOTAL"
+
+                # Insert total row at top
+                filtered_df = pd.concat([pd.DataFrame([total_row]), filtered_df], ignore_index=True)
+
+                # Convert all values to string for Dash display
+                filtered_df = filtered_df.astype(str)
+
+                # Publish as Dash table
+                return Dashboard.publish_table(filtered_df)
+
+            except Exception as e:
+                print(f"Error in prepare_table_active_orders: {e}")
+                # Fallback empty table
+                fallback_df = pd.DataFrame([{col: "N/A" for col in columns_to_keep}])
+                return Dashboard.publish_table(fallback_df)
+
+    @staticmethod
+    def prepare_table_option_tree(call_df_list, put_df_list):
+        """
+        Combine latest rows from call and put option DataFrames into a single summary table.
+        Only merges rows where strike_price matches between call and put.
+        """
+        # Handle None inputs
+        if not isinstance(call_df_list, (list, tuple)) or not isinstance(put_df_list, (list, tuple)):
+            return pd.DataFrame(columns=[
+                "strike_price", "call_oi", "call_vega", "call_theta", "call_gamma", "call_delta",
+                "call_iv", "call_right", "call_close", "put_close", "put_right", "put_delta",
+                "put_gamma", "put_theta", "put_vega", "put_iv"
+            ])
+
+        combined_rows = []
+
+        for call_df, put_df in zip(call_df_list, put_df_list):
+            try:
+                if call_df is None or call_df.empty or put_df is None or put_df.empty:
+                    continue
+
+                latest_call = call_df.iloc[-1]
+                latest_put = put_df.iloc[-1]
+
+                # Check strike price match
+                if latest_call.get("strike_price") != latest_put.get("strike_price"):
+                    continue
+
+                row_data = {
+                    "strike_price": latest_call.get("strike_price", ""),
+
+                    # Call side
+                    "call_oi": latest_call.get("oi", ""),
+                    "call_vega": latest_call.get("vega", ""),
+                    "call_theta": latest_call.get("theta", ""),
+                    "call_gamma": latest_call.get("gamma", ""),
+                    "call_delta": latest_call.get("delta", ""),
+                    "call_iv": latest_call.get("iv", ""),
+                    "call_right": latest_call.get("right", ""),
+                    "call_close": latest_call.get("close", ""),
+
+                    # Put side
+                    "put_close": latest_put.get("close", ""),
+                    "put_right": latest_put.get("right", ""),
+                    "put_delta": latest_put.get("delta", ""),
+                    "put_gamma": latest_put.get("gamma", ""),
+                    "put_theta": latest_put.get("theta", ""),
+                    "put_vega": latest_put.get("vega", ""),
+                    "put_iv": latest_put.get("iv", "")
+                }
+
+                combined_rows.append(row_data)
+
+            except Exception as e:
+                print(f"Error combining call/put pair: {e}")
+                continue
+
+        # Convert to DataFrame
+        if combined_rows:
+            combined_df = pd.DataFrame(combined_rows)
+        else:
+            combined_df = pd.DataFrame(columns=[
+                "strike_price", "call_oi", "call_vega", "call_theta", "call_gamma", "call_delta",
+                "call_iv", "call_right", "call_close", "put_close", "put_right", "put_delta",
+                "put_gamma", "put_theta", "put_vega", "put_iv"
+            ])
+
+        return Dashboard.publish_table(combined_df)
